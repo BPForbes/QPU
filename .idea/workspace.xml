@@ -5,9 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="8b7d0841-5bc4-4ab6-8529-6c51f7205aa1" name="Changes" comment="Adjust logic">
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoBitFullAdder.txt" beforeDir="false" afterPath="$PROJECT_DIR$/TwoBitFullAdder.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/qpu/ast.py" beforeDir="false" afterPath="$PROJECT_DIR$/qpu/ast.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -198,7 +197,7 @@
       <workItem from="1745941949787" duration="18000" />
       <workItem from="1746080726991" duration="149000" />
       <workItem from="1747497757958" duration="16783000" />
-      <workItem from="1752155993927" duration="4829000" />
+      <workItem from="1752155993927" duration="7124000" />
     </task>
     <task id="LOCAL-00001" summary="Adjust logic">
       <option name="closed" value="true" />
@@ -208,7 +207,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752163782433</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Adjust logic">
+      <option name="closed" value="true" />
+      <created>1752187885752</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1752187885752</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
