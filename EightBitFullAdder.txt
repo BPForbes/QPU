@@ -1,0 +1,173 @@
+﻿# ──────────────────────────────────────────────────────────────────────────────
+# 8‑bit ripple‑carry full adder (fixed carry propagation)
+# ──────────────────────────────────────────────────────────────────────────────
+PARAMS: A0:state A1:state A2:state A3:state A4:state A5:state A6:state A7:state \
+        B0:state B1:state B2:state B3:state B4:state B5:state B6:state B7:state \
+        Cin:state
+MAIN-PROCESS EightBitFullAdder
+CYCLE 2
+CREATETOKEN -I C1 C2 Cout S0 S1 S2 S3 S4 S5 S6 S7 SUM
+
+# load operands
+SET A0:0 $A0
+SET A1:0 $A1
+SET A2:0 $A2
+SET A3:0 $A3
+SET A4:0 $A4
+SET A5:0 $A5
+SET A6:0 $A6
+SET A7:0 $A7
+SET B0:0 $B0
+SET B1:0 $B1
+SET B2:0 $B2
+SET B3:0 $B3
+SET B4:0 $B4
+SET B5:0 $B5
+SET B6:0 $B6
+SET B7:0 $B7
+SET Cin:0 $Cin
+SET C1:1 0p
+SET C2:1 0p
+SET Cout:1 0p
+
+# ─── bit 0 ────────────────────────────────────────────────────────────────────
+CCNOT -I A0:0 B0:0 C1:1      -O C1:1
+CNOT  -I A0:0 B0:0          -O B0:1
+CCNOT -I B0:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B0:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S0:1         -O S0:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B0:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B0:1 Cin:1         -O Cin:1
+CNOT  -I A0:0 B0:1          -O B0:1
+CCNOT -I A0:0 B0:0 C1:1     -O C1:1
+# propagate carry (swap Cout↔Cin)
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 1 ────────────────────────────────────────────────────────────────────
+CCNOT -I A1:0 B1:0 C1:1      -O C1:1
+CNOT  -I A1:0 B1:0          -O B1:1
+CCNOT -I B1:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B1:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S1:1         -O S1:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B1:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B1:1 Cin:1         -O Cin:1
+CNOT  -I A1:0 B1:1          -O B1:1
+CCNOT -I A1:0 B1:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 2 ────────────────────────────────────────────────────────────────────
+CCNOT -I A2:0 B2:0 C1:1      -O C1:1
+CNOT  -I A2:0 B2:0          -O B2:1
+CCNOT -I B2:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B2:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S2:1         -O S2:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B2:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B2:1 Cin:1         -O Cin:1
+CNOT  -I A2:0 B2:1          -O B2:1
+CCNOT -I A2:0 B2:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 3 ────────────────────────────────────────────────────────────────────
+CCNOT -I A3:0 B3:0 C1:1      -O C1:1
+CNOT  -I A3:0 B3:0          -O B3:1
+CCNOT -I B3:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B3:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S3:1         -O S3:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B3:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B3:1 Cin:1         -O Cin:1
+CNOT  -I A3:0 B3:1          -O B3:1
+CCNOT -I A3:0 B3:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 4 ────────────────────────────────────────────────────────────────────
+CCNOT -I A4:0 B4:0 C1:1      -O C1:1
+CNOT  -I A4:0 B4:0          -O B4:1
+CCNOT -I B4:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B4:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S4:1         -O S4:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B4:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B4:1 Cin:1         -O Cin:1
+CNOT  -I A4:0 B4:1          -O B4:1
+CCNOT -I A4:0 B4:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 5 ────────────────────────────────────────────────────────────────────
+CCNOT -I A5:0 B5:0 C1:1      -O C1:1
+CNOT  -I A5:0 B5:0          -O B5:1
+CCNOT -I B5:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B5:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S5:1         -O S5:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B5:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B5:1 Cin:1         -O Cin:1
+CNOT  -I A5:0 B5:1          -O B5:1
+CCNOT -I A5:0 B5:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 6 ────────────────────────────────────────────────────────────────────
+CCNOT -I A6:0 B6:0 C1:1      -O C1:1
+CNOT  -I A6:0 B6:0          -O B6:1
+CCNOT -I B6:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B6:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S6:1         -O S6:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B6:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B6:1 Cin:1         -O Cin:1
+CNOT  -I A6:0 B6:1          -O B6:1
+CCNOT -I A6:0 B6:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# ─── bit 7 ────────────────────────────────────────────────────────────────────
+CCNOT -I A7:0 B7:0 C1:1      -O C1:1
+CNOT  -I A7:0 B7:0          -O B7:1
+CCNOT -I B7:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B7:1 Cin:1         -O Cin:1
+CNOT  -I Cin:1 S7:1         -O S7:1
+CCNOT -I C1:1 C2:1 Cout:1   -O Cout:1
+# un‑compute ancillas
+CCNOT -I B7:1 Cin:1 C2:1    -O C2:1
+CNOT  -I B7:1 Cin:1         -O Cin:1
+CNOT  -I A7:0 B7:1          -O B7:1
+CCNOT -I A7:0 B7:0 C1:1     -O C1:1
+# propagate carry
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+CNOT  -I Cin:1 Cout:1       -O Cout:1
+CNOT  -I Cout:1 Cin:1       -O Cin:1
+
+# join result and clean‑up
+JOIN     -I Cout:1 S7:1 S6:1 S5:1 S4:1 S3:1 S2:1 S1:1 S0:1 -O SUM:1
+MEASURE  -I SUM:1
+DELETETOKEN -I C1 C2 Cout S0 S1 S2 S3 S4 S5 S6 S7
+RETURNVALS SUM
