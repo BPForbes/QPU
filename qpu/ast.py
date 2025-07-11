@@ -1,4 +1,4 @@
-﻿# qpu/ast.py
+# qpu/ast.py
 
 """
 Implements an abstract syntax tree (AST) for representing quantum operations
@@ -880,7 +880,7 @@ class DerivedGateASTNode:
             else:  # CCNOT
                 qpu.apply_ccnot(ctrls[0], ctrls[1], tgt)
 
-        final = qpu.local_states[out_q]
+        final = qpu._get_register(out_q)
         memory.setdefault(out_q, {})[out_c] = final
         hilbert.output(out_q, out_c, final)
         return f"{self.gate} → {out_q}", final
@@ -947,19 +947,25 @@ class OrASTNode:
         return True
 
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
-        ctrl1,_ = self.inputs[0]
-        ctrl2,_ = self.inputs[1]
-        qpu.apply_single_qubit_gate(X, ctrl1)
-        qpu.apply_single_qubit_gate(X, ctrl2)
-        qpu.apply_ccnot(ctrl1, ctrl2, self.target_qubit)
-        qpu.apply_single_qubit_gate(X, ctrl1)
-        qpu.apply_single_qubit_gate(X, ctrl2)
-        qpu.apply_single_qubit_gate(X, self.target_qubit)
-        new_state = qpu.local_states[self.target_qubit]
-        out_k, out_c = self.output
-        memory.setdefault(out_k, {})[out_c] = new_state
-        hilbert.output(out_k, out_c, new_state)
-        return f"OR {ctrl1},{ctrl2} → {out_k}", new_state
+      # extract control qubits
+      ctrl1, _ = self.inputs[0]
+      ctrl2, _ = self.inputs[1]
+
+      # Use the built-in OR primitive on the |0p⟩ ancilla,
+      # then flip the ancilla into the target
+      qpu.apply_or(ctrl1, ctrl2)
+      qpu.apply_controlled_gate(X, "0p", self.target_qubit)
+
+      # fetch the updated state of the target register
+      new_state = qpu._get_register(self.target_qubit)
+
+      # record into memory and emit to Hilbert logger
+      out_k, out_c = self.output
+      memory.setdefault(out_k, {})[out_c] = new_state
+      hilbert.output(out_k, out_c, new_state)
+
+      return f"OR {ctrl1},{ctrl2} → {out_k}", new_state
+
 
     def __repr__(self):
         ins = " ".join(f"{k}:{c}" for k,c in self.inputs)
@@ -1173,7 +1179,7 @@ def parse_command(command_str: str):
         if "-I" not in upp or "-O" not in upp:
             raise ValueError("OR requires -I and -O")
         i_idx, o_idx = upp.index("-I"), upp.index("-O")
-        return DerivedGateASTNode("OR", tokens[i_idx+1:o_idx], tokens[o_idx+1])
+        return OrASTNode(tokens[i_idx+1:o_idx], tokens[o_idx+1])
     if cmd == "NOT":
         if "-I" not in upp or "-O" not in upp:
             raise ValueError("NOT requires -I and -O")
