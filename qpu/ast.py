@@ -1,4 +1,4 @@
-﻿# qpu/ast.py
+# qpu/ast.py
 
 """
 Implements an abstract syntax tree (AST) for representing quantum operations

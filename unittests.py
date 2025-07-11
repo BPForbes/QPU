@@ -5,7 +5,6 @@ from qpu.ast import parse_command
 from qpu.qpu_base import QuantumProcessorUnit
 from cli import CircuitSimulator
 
-
 def run_process(proc_file, proc_name, params):
     sim = CircuitSimulator(QuantumProcessorUnit(num_qubits=5))
     sim.current_cycle = 0
@@ -13,86 +12,54 @@ def run_process(proc_file, proc_name, params):
     proto_dir = os.path.dirname(proc_file)
     os.chdir(proto_dir)
     try:
-        compile_cmd = f"COMPILEPROCESS --NAME {proc_name} {os.path.basename(proc_file)}"
-        parse_command(compile_cmd).evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
-        call_args = ' '.join(params)
-        call_cmd = f"CALL {proc_name} -I {call_args}"
-        parse_command(call_cmd).evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        parse_command(f"COMPILEPROCESS --NAME {proc_name} {os.path.basename(proc_file)}") \
+            .evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        parse_command(f"CALL {proc_name} -I {' '.join(params)}") \
+            .evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
     finally:
         os.chdir(cwd)
     return sim
 
-
-class TestSingleBitAdder(unittest.TestCase):
-    def setUp(self):
-        self.zero = np.array([1.0, 0.0], dtype=complex)
-        self.one = np.array([0.0, 1.0], dtype=complex)
-        self.proc_file = os.path.join(os.path.dirname(__file__), "SingleBitFullAdder.txt")
-        self.proc_name = "SingleBitFullAdder"
-        self.cases = [
-            ("0p", "0p", "0p", self.zero, self.zero),
-            ("0p", "0p", "1p", self.one, self.zero),
-            ("0p", "1p", "0p", self.one, self.zero),
-            ("0p", "1p", "1p", self.zero, self.one),
-            ("1p", "0p", "0p", self.one, self.zero),
-            ("1p", "0p", "1p", self.zero, self.one),
-            ("1p", "1p", "0p", self.zero, self.one),
-            ("1p", "1p", "1p", self.one, self.one),
-        ]
-
-    def test_all_combinations(self):
-        for A, B, Cin, exp_sum, exp_cout in self.cases:
-            with self.subTest(A=A, B=B, Cin=Cin):
-                sim = run_process(self.proc_file, self.proc_name, [A, B, Cin])
-                s_cycle = max(sim.memory[3].keys())
-                c_cycle = max(sim.memory[4].keys())
-                s = sim.memory[3][s_cycle]
-                c = sim.memory[4][c_cycle]
-                np.testing.assert_allclose(s, exp_sum, atol=1e-7)
-                np.testing.assert_allclose(c, exp_cout, atol=1e-7)
-
-
 class TestTwoBitAdder(unittest.TestCase):
     def setUp(self):
         self.zero = np.array([1.0, 0.0], dtype=complex)
-        self.one = np.array([0.0, 1.0], dtype=complex)
+        self.one  = np.array([0.0, 1.0], dtype=complex)
         self.proc_file = os.path.join(os.path.dirname(__file__), "TwoBitFullAdder.txt")
         self.proc_name = "TwoBitFullAdder"
+        self.N = 2
 
-    def expected(self, A0, A1, B0, B1, Cin):
-        a = (int(A1[-2]) << 1) | int(A0[-2])
-        b = (int(B1[-2]) << 1) | int(B0[-2])
-        cin = int(Cin[-2])
+    def expected(self, a, b, cin):
         total = a + b + cin
-        s0 = (total & 1)
-        s1 = (total >> 1) & 1
+        # sum bits s0, s1 and carry out
+        s0   = (total >> 0) & 1
+        s1   = (total >> 1) & 1
         cout = (total >> 2) & 1
         return (self.one if s0 else self.zero,
                 self.one if s1 else self.zero,
                 self.one if cout else self.zero)
 
     def test_all_combinations(self):
-        bits = ["0p", "1p"]
-        for A0 in bits:
-            for A1 in bits:
-                for B0 in bits:
-                    for B1 in bits:
-                        for Cin in bits:
-                            with self.subTest(A0=A0, A1=A1, B0=B0, B1=B1, Cin=Cin):
-                                sim = run_process(self.proc_file, self.proc_name,
-                                                  [A0, A1, B0, B1, Cin])
-                                s0_cycle = max(sim.memory["Sum0"].keys())
-                                s1_cycle = max(sim.memory["Sum1"].keys())
-                                cout_cycle = max(sim.memory["Cout"].keys())
-                                s0 = sim.memory["Sum0"][s0_cycle]
-                                s1 = sim.memory["Sum1"][s1_cycle]
-                                cout = sim.memory["Cout"][cout_cycle]
-                                exp_s0, exp_s1, exp_cout = self.expected(A0, A1, B0, B1, Cin)
-                                np.testing.assert_allclose(s0, exp_s0, atol=1e-7)
-                                np.testing.assert_allclose(s1, exp_s1, atol=1e-7)
-                                np.testing.assert_allclose(cout, exp_cout, atol=1e-7)
+        for a in range(2**self.N):
+            for b in range(2**self.N):
+                for cin in (0, 1):
+                    with self.subTest(a=a, b=b, cin=cin):
+                        # format inputs as "0p"/"1p"
+                        params = [f"{(a>>i)&1}p" for i in range(self.N)]
+                        params += [f"{(b>>i)&1}p" for i in range(self.N)]
+                        params.append(f"{cin}p")
 
+                        sim = run_process(self.proc_file, self.proc_name, params)
+                        s0_cycle = max(sim.memory["Sum0"].keys())
+                        s1_cycle = max(sim.memory["Sum1"].keys())
+                        cout_cycle = max(sim.memory["Cout"].keys())
 
-if __name__ == "__main__":
-    unittest.main()
+                        s0, s1, cout = (
+                            sim.memory["Sum0"][s0_cycle],
+                            sim.memory["Sum1"][s1_cycle],
+                            sim.memory["Cout"][cout_cycle]
+                        )
+                        exp_s0, exp_s1, exp_cout = self.expected(a, b, cin)
 
+                        np.testing.assert_allclose(s0, exp_s0, atol=1e-7)
+                        np.testing.assert_allclose(s1, exp_s1, atol=1e-7)
+                        np.testing.assert_allclose(cout, exp_cout, atol=1e-7)
