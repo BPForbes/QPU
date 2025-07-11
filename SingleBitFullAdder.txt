@@ -2,35 +2,26 @@ PARAMS: A:1 B:1 Cin:1
 
 MAIN-PROCESS SingleBitFullAdder
 CYCLE 1
-CREATETOKEN -I t2
 
 # Load inputs
 SET 0:0 $A
 SET 1:0 $B
-SET 2:0 $Cin
+SET 2:0 0p
+CNOT -I $Cin -O 2:0
 SET 3:0 0p    # Sum
-SET 4:0 0p    # temp t1
+SET 4:0 0p    # Cout
 
-# t1 = A AND B
-CCNOT -I 0:0 1:0 -O 4:0
-# Sum = A XOR B
+# Sum = A XOR B XOR Cin
 CNOT -I 0:0 -O 3:0
 CNOT -I 1:0 -O 3:0
-# t2 = Sum AND Cin
-CCNOT -I 3:0 2:0 -O t2:0
-# Sum = Sum XOR Cin
 CNOT -I 2:0 -O 3:0
-# Reset Cout qubit
-SET 2:0 0p
-# Cout = OR(t1, t2)
-CNOT -I 4:0 -O 2:0
-CNOT -I t2:0 -O 2:0
-CCNOT -I 4:0 t2:0 -O 2:0
+
+# Cout = majority(A,B,Cin)
+CCNOT -I 0:0 1:0 -O 4:0
+CCNOT -I 0:0 2:0 -O 4:0
+CCNOT -I 1:0 2:0 -O 4:0
 
 MEASURE -I 3
-MEASURE -I 2
+MEASURE -I 4
 
-DELETETOKEN -I t2
-RETURNVALS 3 2
-
-
+RETURNVALS 3 4

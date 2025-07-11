@@ -1,4 +1,4 @@
-﻿# qpu/ast.py
+# qpu/ast.py
 
 """
 Implements an abstract syntax tree (AST) for representing quantum operations
@@ -999,6 +999,10 @@ class AcceptValsASTNode:
         mapping = simulator.last_child_returns
         for lk, rv in zip(self.locals, mapping.values()):
             memory.setdefault(lk, {})[current_cycle] = rv
+            if qpu is not None and isinstance(lk, str):
+                qpu.custom_states[lk] = rv
+                if simulator is not None:
+                    simulator.custom_tokens[lk] = lk
         return f"Accepted {list(mapping.keys())} → {self.locals}", None
 
     def __repr__(self):
@@ -1046,7 +1050,12 @@ class RunChildASTNode:
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
         if simulator is None or not hasattr(simulator, "run_child"):
             raise ValueError("RUNCHILD requires a simulator")
-        ret_vals, _ = simulator.run_child(self.child, self.params, {})
+        parent_tokens = {}
+        for p in self.params:
+            if p.lower() not in ("0p", "1p", "sp"):
+                base = p.split(":")[0]
+                parent_tokens[base] = base
+        ret_vals, _ = simulator.run_child(self.child, self.params, parent_tokens)
         simulator.last_child_returns = dict(
             zip(simulator.child_return_keys, ret_vals)
         )

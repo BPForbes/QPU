@@ -17,7 +17,7 @@ ACCEPTVALS Sum0 Cmid
 CYCLE 1
 SET A1:1   $A1
 SET B1:1   $B1
-RUNCHILD SingleBitFullAdder -I $A1 $B1 Cmid:0    -O Sum1 Cout:1
+RUNCHILD SingleBitFullAdder -I $A1 $B1 Cmid    -O Sum1 Cout:1
 ACCEPTVALS Sum1 Cout
 
 DELETETOKEN -I Cmid
