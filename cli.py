@@ -188,8 +188,10 @@ class CircuitSimulator:
 
         # gather return values from final local cycle
         ret_vals = []
+        from qpu.ast import interpret_token
         for key in self.child_return_keys:
-            val = readdress_value(self.memory, key, local_cycle - 1, self.qpu)
+            k = interpret_token(key)
+            val = readdress_value(self.memory, k, local_cycle - 1, self.qpu)
             ret_vals.append(val)
 
         # Collect updated states of injected parent tokens, only if changed

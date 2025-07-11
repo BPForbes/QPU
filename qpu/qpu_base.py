@@ -182,64 +182,41 @@ class QuantumProcessorUnit:
         return new_reg
 
     def apply_controlled_gate(self, gate, control, target):
-        """
-        Single-controlled gate.  Fast-path for int,int; otherwise on-register.
-        """
+        """Apply a single-controlled gate using a simplified classical model."""
         self._validate_qubit(control, target)
-        cs = self._get_register(control)
-        ts = self._get_register(target)
-        (cs, ts), _ = embed_registers(cs, ts)
-        self._update_register(control, cs)
-        self._update_register(target, ts)
 
-        if isinstance(control, int) and isinstance(target, int):
-            c_mask = 1 << control
-            t_mask = 1 << target
-            N = self.state.size
-            for i in range(N):
-                if (i & c_mask) == 0:
-                    continue
-                j = i ^ t_mask
-                a, b = self.state[i], self.state[j]
-                self.state[i] = gate[0,0]*a + gate[0,1]*b
-                self.state[j] = gate[1,0]*a + gate[1,1]*b
-            # also update the single-qubit register
-            new_t = gate @ self.local_states[target]
-            self._update_register(target, new_t)
-            return new_t
+        c_state = self._get_register(control)
+        t_state = self._get_register(target)
+        (c_state, t_state), _ = embed_registers(c_state, t_state)
+        self._update_register(control, c_state)
+
+        if abs(c_state[1]) > 0.5:
+            new_t = self.apply_single_qubit_gate(gate, target)
         else:
-            return self.apply_single_qubit_gate(gate, target)
+            new_t = t_state
+
+        return new_t
 
     def apply_cnot(self, control, target):
         return self.apply_controlled_gate(X, control, target)
 
     def apply_ccnot(self, control1, control2, target):
-        """
-        Toffoli: flips `target` iff both controls are |1⟩.
-        """
+        """Toffoli gate using the simplified classical model."""
         self._validate_qubit(control1, control2, target)
+
         s1 = self._get_register(control1)
         s2 = self._get_register(control2)
         st = self._get_register(target)
         (s1, s2, st), _ = embed_registers(s1, s2, st)
         self._update_register(control1, s1)
         self._update_register(control2, s2)
-        self._update_register(target, st)
 
-        if all(isinstance(x, int) for x in (control1, control2, target)):
-            m1 = 1 << control1
-            m2 = 1 << control2
-            mt = 1 << target
-            N = self.state.size
-            for i in range(N):
-                if (i & m1) and (i & m2):
-                    j = i ^ mt
-                    self.state[i], self.state[j] = self.state[j], self.state[i]
-            # refresh the single-qubit register
-            return self._get_register(target)
+        if abs(s1[1]) > 0.5 and abs(s2[1]) > 0.5:
+            new_t = self.apply_single_qubit_gate(X, target)
         else:
-            # fallback: X on target
-            return self.apply_single_qubit_gate(X, target)
+            new_t = st
+
+        return new_t
 
     # ----------------------------------------------------------------
     # Built-in Boolean primitives (no explicit target argument):
