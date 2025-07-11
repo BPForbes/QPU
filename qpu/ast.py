@@ -1005,6 +1005,60 @@ class AcceptValsASTNode:
         return "ACCEPTVALS " + " ".join(self.locals)
 
 
+class DeclareChildASTNode:
+    """AST node for DECLARECHILD <child>."""
+    def __init__(self, tokens):
+        if len(tokens) != 1:
+            raise ValueError("DECLARECHILD requires one child name")
+        self.child = tokens[0]
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is None or not hasattr(simulator, "declare_child"):
+            raise ValueError("DECLARECHILD requires a simulator")
+        simulator.declare_child(self.child)
+        return f"Declared child '{self.child}'", None
+
+    def __repr__(self):
+        return f"DECLARECHILD {self.child}"
+
+
+class RunChildASTNode:
+    """AST node for RUNCHILD <child> -I ..."""
+    def __init__(self, tokens):
+        if not tokens:
+            raise ValueError("RUNCHILD requires a child process name")
+        self.child = tokens[0]
+        U = [t.upper() for t in tokens]
+        self.params = []
+        if "-I" in U:
+            i_idx = U.index("-I")
+            o_idx = U.index("-O") if "-O" in U else len(tokens)
+            self.params = tokens[i_idx + 1 : o_idx]
+        else:
+            self.params = []
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is None or not hasattr(simulator, "run_child"):
+            raise ValueError("RUNCHILD requires a simulator")
+        ret_vals, _ = simulator.run_child(self.child, self.params, {})
+        simulator.last_child_returns = dict(
+            zip(simulator.child_return_keys, ret_vals)
+        )
+        return f"Ran child '{self.child}'", None
+
+    def __repr__(self):
+        s = f"RUNCHILD {self.child}"
+        if self.params:
+            s += " -I " + " ".join(self.params)
+        return s
+
+
 # ------------------------------------------------------------------------
 # Generic gate AST node for primitive gates
 # ------------------------------------------------------------------------
@@ -1155,6 +1209,10 @@ def parse_command(command_str: str):
         return SplitASTNode(tokens[1:])
     if cmd == "CALL":
         return CallASTNode(tokens)
+    if cmd == "DECLARECHILD":
+        return DeclareChildASTNode(tokens[1:])
+    if cmd == "RUNCHILD":
+        return RunChildASTNode(tokens[1:])
     if cmd == "CREATETOKEN":
         return CreateTokenASTNode(tokens[1:])
     if cmd == "DELETETOKEN":
