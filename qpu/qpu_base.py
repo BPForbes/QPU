@@ -193,22 +193,20 @@ class QuantumProcessorUnit:
         self._update_register(target, ts)
 
         if isinstance(control, int) and isinstance(target, int):
-            c_mask = 1 << control
-            t_mask = 1 << target
-            N = self.state.size
-            for i in range(N):
-                if (i & c_mask) == 0:
-                    continue
-                j = i ^ t_mask
-                a, b = self.state[i], self.state[j]
-                self.state[i] = gate[0,0]*a + gate[0,1]*b
-                self.state[j] = gate[1,0]*a + gate[1,1]*b
-            # also update the single-qubit register
-            new_t = gate @ self.local_states[target]
+            if np.allclose(self.local_states[control], [0,1]):
+                new_t = gate @ self.local_states[target]
+            else:
+                new_t = self.local_states[target]
             self._update_register(target, new_t)
             return new_t
         else:
-            return self.apply_single_qubit_gate(gate, target)
+            # Basic classical handling for custom qubit controls
+            if np.allclose(cs, [0, 1]):
+                new_t = gate @ ts
+            else:
+                new_t = ts
+            self._update_register(target, new_t)
+            return new_t
 
     def apply_cnot(self, control, target):
         return self.apply_controlled_gate(X, control, target)
@@ -238,8 +236,10 @@ class QuantumProcessorUnit:
             # refresh the single-qubit register
             return self._get_register(target)
         else:
-            # fallback: X on target
-            return self.apply_single_qubit_gate(X, target)
+            if np.allclose(s1, [0,1]) and np.allclose(s2, [0,1]):
+                return self.apply_single_qubit_gate(X, target)
+            else:
+                return st
 
     # ----------------------------------------------------------------
     # Built-in Boolean primitives (no explicit target argument):

@@ -951,10 +951,20 @@ class OrASTNode:
       ctrl1, _ = self.inputs[0]
       ctrl2, _ = self.inputs[1]
 
-      # Use the built-in OR primitive on the |0p⟩ ancilla,
-      # then flip the ancilla into the target
+      # Use the built-in OR primitive on the |0p⟩ ancilla
       qpu.apply_or(ctrl1, ctrl2)
-      qpu.apply_controlled_gate(X, "0p", self.target_qubit)
+
+      # Reset the target to |0⟩ so OR acts like assignment rather than XOR
+      zero = np.array([1.0, 0.0], dtype=complex)
+      if isinstance(self.target_qubit, int):
+          qpu.local_states[self.target_qubit] = zero
+      else:
+          qpu.custom_states[self.target_qubit] = zero
+          if simulator is not None:
+              simulator.custom_tokens[self.target_qubit] = self.target_qubit
+
+      # Copy the ancilla result onto the target
+      qpu.apply_cnot("0p", self.target_qubit)
 
       # fetch the updated state of the target register
       new_state = qpu._get_register(self.target_qubit)
