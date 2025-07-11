@@ -159,9 +159,42 @@ class QuantumProcessorUnit:
         col0 = mat[:,0]
         return col0 / np.linalg.norm(col0)
 
-    def apply_single_qubit_gate(self, gate, target, sub_index=0):
+    # ------------------------------------------------------------------
+    # Global state helpers
+    # ------------------------------------------------------------------
+
+    def rebuild_global_state(self):
+        """Rebuild ``self.state`` from the per-qubit ``local_states``."""
+        if not self.local_states:
+            self.state = np.array([1], dtype=complex)
+            return
+        state = self.local_states[-1]
+        for reg in reversed(self.local_states[:-1]):
+            state = np.kron(state, reg)
+        self.state = state
+
+    def _refresh_physical_qubit(self, idx):
+        """Extract the single-qubit state for ``idx`` from ``self.state``."""
+        mask = 1 << idx
+        a = 0j
+        b = 0j
+        for i, amp in enumerate(self.state):
+            if (i & mask) == 0:
+                a += amp
+            else:
+                b += amp
+        vec = np.array([a, b], dtype=complex)
+        n = np.linalg.norm(vec)
+        if n > 0:
+            vec /= n
+        self.local_states[idx] = vec
+        return vec
+
+    def apply_single_qubit_gate(self, gate, target, sub_index=0, *, cycle=None, hilbert=None):
         """
-        Apply a 2×2 gate to `target`.  Updates the global state if `target` is int.
+        Apply a 2×2 gate to `target`. Updates the global state if `target` is int.
+        When ``hilbert`` and ``cycle`` are provided, the resulting state is also
+        recorded in the :class:`HilbertSpace` instance.
         """
         self._validate_qubit(target)
         reg = self._get_register(target, target_dim=2)
@@ -176,45 +209,66 @@ class QuantumProcessorUnit:
                     a, b = self.state[i], self.state[j]
                     self.state[i] = gate[0,0]*a + gate[0,1]*b
                     self.state[j] = gate[1,0]*a + gate[1,1]*b
+            # refresh local state from the updated global state
+            new_reg = self._refresh_physical_qubit(target)
+        else:
+            new_reg = gate @ reg
 
-        new_reg = gate @ reg
         self._update_register(target, new_reg)
+
+        # Record to hilbert if requested
+        if hilbert is not None and cycle is not None:
+            hilbert.output(target, cycle, new_reg)
+
         return new_reg
 
-    def apply_controlled_gate(self, gate, control, target):
+    def apply_controlled_gate(self, gate, control, target, *, cycle=None, hilbert=None):
         """Apply a single-controlled gate using a simplified classical model."""
         self._validate_qubit(control, target)
 
-        c_state = self._get_register(control)
-        t_state = self._get_register(target)
+        c_state = self._get_register(control, target_dim=2)
+        t_state = self._get_register(target, target_dim=2)
         (c_state, t_state), _ = embed_registers(c_state, t_state)
         self._update_register(control, c_state)
 
         if abs(c_state[1]) > 0.5:
-            new_t = self.apply_single_qubit_gate(gate, target)
+            new_t = self.apply_single_qubit_gate(gate, target, cycle=cycle, hilbert=hilbert)
         else:
             new_t = t_state
 
+        # refresh local state if physical target not modified
+        if isinstance(target, int) and abs(c_state[1]) <= 0.5:
+            new_t = self._get_register(target, target_dim=2)
+
+        if hilbert is not None and cycle is not None:
+            hilbert.output(target, cycle, new_t)
+
         return new_t
 
-    def apply_cnot(self, control, target):
-        return self.apply_controlled_gate(X, control, target)
+    def apply_cnot(self, control, target, *, cycle=None, hilbert=None):
+        return self.apply_controlled_gate(X, control, target, cycle=cycle, hilbert=hilbert)
 
-    def apply_ccnot(self, control1, control2, target):
+    def apply_ccnot(self, control1, control2, target, *, cycle=None, hilbert=None):
         """Toffoli gate using the simplified classical model."""
         self._validate_qubit(control1, control2, target)
 
-        s1 = self._get_register(control1)
-        s2 = self._get_register(control2)
-        st = self._get_register(target)
+        s1 = self._get_register(control1, target_dim=2)
+        s2 = self._get_register(control2, target_dim=2)
+        st = self._get_register(target, target_dim=2)
         (s1, s2, st), _ = embed_registers(s1, s2, st)
         self._update_register(control1, s1)
         self._update_register(control2, s2)
 
         if abs(s1[1]) > 0.5 and abs(s2[1]) > 0.5:
-            new_t = self.apply_single_qubit_gate(X, target)
+            new_t = self.apply_single_qubit_gate(X, target, cycle=cycle, hilbert=hilbert)
         else:
             new_t = st
+            if hilbert is not None and cycle is not None:
+                hilbert.output(target, cycle, new_t)
+
+        # refresh local state if physical target not modified
+        if isinstance(target, int) and not (abs(s1[1]) > 0.5 and abs(s2[1]) > 0.5):
+            new_t = self._get_register(target, target_dim=2)
 
         return new_t
 
@@ -222,56 +276,56 @@ class QuantumProcessorUnit:
     # Built-in Boolean primitives (no explicit target argument):
     # ----------------------------------------------------------------
 
-    def apply_not(self, a):
+    def apply_not(self, a, *, cycle=None, hilbert=None):
         """
         Compute NOT(A) onto the special |1p⟩ register:
           CCNOT(A, "1p", "1p") flips "1p" ─→ |1⟩⊕A = NOT(A).
         """
         # reset "1p" to |1>
         self.custom_states["1p"] = np.array([0,1], dtype=complex)
-        return self.apply_ccnot(a, "1p", "1p")
+        return self.apply_ccnot(a, "1p", "1p", cycle=cycle, hilbert=hilbert)
 
-    def apply_and(self, a, b):
+    def apply_and(self, a, b, *, cycle=None, hilbert=None):
         """
         Compute A∧B onto the special |0p⟩ register:
           CCNOT(A, B, "0p") flips "0p" from |0> to |1> exactly when A=B=1.
         """
         self.custom_states["0p"] = np.array([1,0], dtype=complex)
-        return self.apply_ccnot(a, b, "0p")
+        return self.apply_ccnot(a, b, "0p", cycle=cycle, hilbert=hilbert)
 
-    def apply_nand(self, a, b):
+    def apply_nand(self, a, b, *, cycle=None, hilbert=None):
         """
         Compute NAND(A,B) onto "1p":
           CCNOT(A, B, "1p") flips "1p" from |1>→|0> iff A=B=1.
         """
         self.custom_states["1p"] = np.array([0,1], dtype=complex)
-        return self.apply_ccnot(a, b, "1p")
+        return self.apply_ccnot(a, b, "1p", cycle=cycle, hilbert=hilbert)
 
-    def apply_xor(self, a, b):
+    def apply_xor(self, a, b, *, cycle=None, hilbert=None):
         """
         Compute A⊕B onto "0p" via two CNOTs:
           CNOT(A, "0p");  CNOT(B, "0p")
         """
         self.custom_states["0p"] = np.array([1,0], dtype=complex)
-        self.apply_cnot(a, "0p")
-        self.apply_cnot(b, "0p")
+        self.apply_cnot(a, "0p", cycle=cycle, hilbert=hilbert)
+        self.apply_cnot(b, "0p", cycle=cycle, hilbert=hilbert)
         return self._get_register("0p")
 
-    def apply_or(self, a, b):
+    def apply_or(self, a, b, *, cycle=None, hilbert=None):
         """
         Compute A∨B onto "0p":
           CNOT(A, "0p"); CNOT(B, "0p"); CCNOT(A, B, "0p")
         """
         self.custom_states["0p"] = np.array([1,0], dtype=complex)
-        self.apply_cnot(a, "0p")
-        self.apply_cnot(b, "0p")
-        self.apply_ccnot(a, b, "0p")
+        self.apply_cnot(a, "0p", cycle=cycle, hilbert=hilbert)
+        self.apply_cnot(b, "0p", cycle=cycle, hilbert=hilbert)
+        self.apply_ccnot(a, b, "0p", cycle=cycle, hilbert=hilbert)
         return self._get_register("0p")
 
-    def apply_phase(self, angle, target):
+    def apply_phase(self, angle, target, *, cycle=None, hilbert=None):
         P = np.array([[1, 0],
                       [0, np.exp(1j*angle)]], dtype=complex)
-        return self.apply_single_qubit_gate(P, target)
+        return self.apply_single_qubit_gate(P, target, cycle=cycle, hilbert=hilbert)
 
     # ----------------------------------------------------------------
     # Measurement

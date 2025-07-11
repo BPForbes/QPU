@@ -405,6 +405,7 @@ class SetASTNode:
 
         if isinstance(self.key, int) and self.key < qpu.num_qubits:
             qpu.local_states[self.key] = state
+            qpu.rebuild_global_state()
         else:
             qpu.custom_states[self.key] = state
             simulator.custom_tokens[self.key] = self.key

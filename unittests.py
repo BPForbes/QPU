@@ -127,5 +127,26 @@ for idx, combo in enumerate(_two_bit_combos):
     setattr(TestTwoBitAdder, name, _make_two_bit_test(*combo))
 
 
+# -------------------------------------------------------------------
+# Direct gate interaction with Hilbert space
+# -------------------------------------------------------------------
+class TestGateHilbert(unittest.TestCase):
+    def test_cnot_logs_hilbert(self):
+        qpu = QuantumProcessorUnit(num_qubits=2)
+        hilbert = qpu.hilbert if hasattr(qpu, 'hilbert') else None
+        if hilbert is None:
+            from qpu.hilbert import HilbertSpace
+            hilbert = HilbertSpace()
+        # initialize control |1> and target |0>
+        qpu.local_states[0] = np.array([0,1], dtype=complex)
+        qpu.local_states[1] = np.array([1,0], dtype=complex)
+        qpu.rebuild_global_state()
+
+        qpu.apply_cnot(0, 1, cycle=0, hilbert=hilbert)
+
+        self.assertIn((1, 0), hilbert.space)
+        np.testing.assert_allclose(hilbert.space[(1,0)], np.array([0,1], dtype=complex))
+
+
 if __name__ == "__main__":
     unittest.main()
