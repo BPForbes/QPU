@@ -1,31 +1,61 @@
-PARAMS: A:1 B:1 Cin:1
+﻿PARAMS: A:1 B:1 Cin:1
 
 MAIN-PROCESS SingleBitFullAdder
 CYCLE 2
-CREATETOKEN -I T1 T2
 
-# Load inputs
-SET 0:0 $A
-SET 1:0 $B
-SET 2:0 $Cin
-SET 3:0 0p    # SUM
-SET T1:0 0p   # temp for carries
-SET T2:0 0p   # temp for carries
+# Initialize inputs and working qubits
+SET 0:0 $A    # Input A
+SET 1:0 $B    # Input B
+SET 2:0 $Cin  # Input Cin
+SET 3:0 0p    # SUM qubit (init |0⟩)
+SET 4:0 0p    # Carry temp (init |0⟩)
+SET 0:1 0p    # Carry temp (init |0⟩)
 
-# SUM = A ⊕ B ⊕ Cin
-CNOT -I 0:0 -O 3:0
-CNOT -I 1:0 -O 3:0
-CNOT -I 2:0 -O 3:0
+# Compute SUM = A ⊕ B ⊕ Cin
+CNOT -I 0:0 -O 3:0  # A → SUM
+CNOT -I 1:0 -O 3:0  # B → SUM (SUM = A⊕B)
+CNOT -I 2:0 -O 3:0  # Cin → SUM (SUM = A⊕B⊕Cin)
 
-# Carry-out via pairwise AND/OR
-CCNOT -I 0:0 1:0 -O T1:0       # A∧B
-CCNOT -I 0:0 2:0 -O T2:0       # A∧Cin
-OR -I T1:0 T2:0 -O T1:0        # T1 = (A∧B) ∨ (A∧Cin)
-CCNOT -I 1:0 2:0 -O T2:0       # B∧Cin
-OR -I T1:0 T2:0 -O 2:0         # Cout
+# Compute carry-out using majority function:
+# Cout = (A∧B) ∨ (A∧Cin) ∨ (B∧Cin)
 
-MEASURE -I 3:0
-MEASURE -I 2:0
+# First compute A AND B into temp1 (qubit 4)
+CCNOT -I 0:0 1:0 -O 4:0
+
+# Compute A AND Cin into temp2 (qubit 5)
+CCNOT -I 0:0 2:0 -O 0:1
+
+# Compute B AND Cin and OR with previous results
+# Using the identity: x ∨ y = ¬(¬x ∧ ¬y)
+# We'll accumulate into Cout (qubit 2)
+
+# First copy temp1 (A∧B) to Cout
+CNOT -I 4:0 -O 2:0
+
+# Compute OR with temp2 (A∧Cin) using DeMorgan's:
+# x ∨ y = ¬(¬x ∧ ¬y)
+# So we first NOT both operands
+X -I 2:0 -O 2:0  # NOT Cout
+X -I 0:1 -O 0:1  # NOT temp2
+# Then AND them
+CCNOT -I 2:0 0:1 -O 2:0
+# Then NOT the result
+X -I 2:0 -O 2:0
+
+# Now handle third term (B∧Cin) similarly
+# First compute B∧Cin into temp1 (qubit 4)
+CCNOT -I 1:0 2:0 -O 4:0
+
+# NOT Cout and temp1
+X -I 2:0 -O 2:0
+X -I 4:0 -O 4:0
+# AND them
+CCNOT -I 2:0 4:0 -O 2:0
+# NOT the final result
+X -I 2:0 -O 2:0
+
+# Measurement
+MEASURE -I 3:0  # SUM
+MEASURE -I 2:0  # Cout
 
 RETURNVALS 3 2
-DELETETOKEN -I T1 T2

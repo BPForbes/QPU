@@ -4,9 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8b7d0841-5bc4-4ab6-8529-6c51f7205aa1" name="Changes" comment="Adjust logic">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="8b7d0841-5bc4-4ab6-8529-6c51f7205aa1" name="Changes" comment="Adjust Project structure">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AGENTS.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/SingleBitFullAdder.txt" beforeDir="false" afterPath="$PROJECT_DIR$/SingleBitFullAdder.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TwoBitFullAdder.txt" beforeDir="false" afterPath="$PROJECT_DIR$/TwoBitFullAdder.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/qpu/ast.py" beforeDir="false" afterPath="$PROJECT_DIR$/qpu/ast.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/qpu/qpu_base.py" beforeDir="false" afterPath="$PROJECT_DIR$/qpu/qpu_base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/unittests.py" beforeDir="false" afterPath="$PROJECT_DIR$/unittests.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -68,7 +75,7 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="Python tests.Python tests for unittests.TestQuantumFullAdder.test_all_combinations">
+  <component name="RunManager" selected="Python tests.Python tests in unittests.py">
     <configuration name="cli" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="QPU" />
       <option name="ENV_FILES" value="" />
@@ -165,8 +172,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python tests.Python tests for unittests.TestQuantumFullAdder.test_all_combinations" />
         <item itemvalue="Python tests.Python tests in unittests.py" />
+        <item itemvalue="Python tests.Python tests for unittests.TestQuantumFullAdder.test_all_combinations" />
         <item itemvalue="Python tests.Python tests for unittests.TestQuantumFullAdder" />
         <item itemvalue="Python.cli" />
         <item itemvalue="Python.main" />
@@ -197,7 +204,7 @@
       <workItem from="1745941949787" duration="18000" />
       <workItem from="1746080726991" duration="149000" />
       <workItem from="1747497757958" duration="16783000" />
-      <workItem from="1752155993927" duration="7124000" />
+      <workItem from="1752155993927" duration="11569000" />
     </task>
     <task id="LOCAL-00001" summary="Adjust logic">
       <option name="closed" value="true" />
@@ -215,7 +222,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752187885752</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Adjust Project structure">
+      <option name="closed" value="true" />
+      <created>1752191234305</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1752191234305</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -226,7 +241,19 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="HEAD" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
           </value>
         </entry>
       </map>
@@ -234,11 +261,13 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Adjust logic" />
-    <option name="LAST_COMMIT_MESSAGE" value="Adjust logic" />
+    <MESSAGE value="Merge remote-tracking branch 'origin/master'" />
+    <MESSAGE value="Adjust Project structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="Adjust Project structure" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/QPU$cli.coverage" NAME="cli Coverage Results" MODIFIED="1745043567409" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/QPU$.coverage" NAME=" Coverage Results" MODIFIED="1752184931988" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/QPU$.coverage" NAME=" Coverage Results" MODIFIED="1752255742355" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/QPU$main.coverage" NAME="main Coverage Results" MODIFIED="1745040491265" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
