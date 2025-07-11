@@ -10,7 +10,7 @@ SET Cmid:0 0p
 SET A0:0   $A0
 SET B0:0   $B0
 SET Cin:0  $Cin
-RUNCHILD SingleBitFullAdder -I $A0 $B0 $Cin      -O Sum0 Cmid:0
+RUNCHILD SingleBitFullAdder -I $A0 $B0 $Cin -O Sum0 Cmid:0
 ACCEPTVALS Sum0 Cmid
 
 # bit1 at cycle1
