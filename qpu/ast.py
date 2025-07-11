@@ -1,4 +1,4 @@
-﻿# qpu/ast.py
+# qpu/ast.py
 
 """
 Implements an abstract syntax tree (AST) for representing quantum operations
@@ -947,17 +947,25 @@ class OrASTNode:
         return True
 
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
-        ctrl1, _ = self.inputs[0]
-        ctrl2, _ = self.inputs[1]
+      # extract control qubits
+      ctrl1, _ = self.inputs[0]
+      ctrl2, _ = self.inputs[1]
 
-        # Use the built-in OR primitive on the |0p⟩ ancilla
-        qpu.apply_or(ctrl1, ctrl2)
-        qpu.apply_controlled_gate(X, "0p", self.target_qubit)
-        new_state = qpu._get_register(self.target_qubit)
-        out_k, out_c = self.output
-        memory.setdefault(out_k, {})[out_c] = new_state
-        hilbert.output(out_k, out_c, new_state)
-        return f"OR {ctrl1},{ctrl2} → {out_k}", new_state
+      # Use the built-in OR primitive on the |0p⟩ ancilla,
+      # then flip the ancilla into the target
+      qpu.apply_or(ctrl1, ctrl2)
+      qpu.apply_controlled_gate(X, "0p", self.target_qubit)
+
+      # fetch the updated state of the target register
+      new_state = qpu._get_register(self.target_qubit)
+
+      # record into memory and emit to Hilbert logger
+      out_k, out_c = self.output
+      memory.setdefault(out_k, {})[out_c] = new_state
+      hilbert.output(out_k, out_c, new_state)
+
+      return f"OR {ctrl1},{ctrl2} → {out_k}", new_state
+
 
     def __repr__(self):
         ins = " ".join(f"{k}:{c}" for k,c in self.inputs)
