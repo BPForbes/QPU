@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="8b7d0841-5bc4-4ab6-8529-6c51f7205aa1" name="Changes" comment="Adjust Structure of processes and tests">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/EightBitFullAdder.txt" beforeDir="false" afterPath="$PROJECT_DIR$/EightBitFullAdder.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoBitFullAdder.txt" beforeDir="false" afterPath="$PROJECT_DIR$/TwoBitFullAdder.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -70,7 +71,7 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="Python tests.Python tests for unittests.TestTwoBitAdder">
+  <component name="RunManager" selected="Python tests.Python tests in unittests.py">
     <configuration name="Python tests for unittests.TestQuantumFullAdder" type="tests" factoryName="Autodetect" temporary="true" nameIsGenerated="true">
       <module name="QPU" />
       <option name="ENV_FILES" value="" />
@@ -153,11 +154,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python tests.Python tests in unittests.py" />
         <item itemvalue="Python tests.Python tests for unittests.TestTwoBitAdder" />
         <item itemvalue="Python tests.Python tests for unittests.TestTwoBitAdder.test_all_combinations" />
         <item itemvalue="Python tests.Python tests for unittests.TestQuantumFullAdder.test_all_combinations" />
         <item itemvalue="Python tests.Python tests for unittests.TestQuantumFullAdder" />
-        <item itemvalue="Python tests.Python tests in unittests.py" />
       </list>
     </recent_temporary>
   </component>
@@ -185,7 +186,7 @@
       <workItem from="1745941949787" duration="18000" />
       <workItem from="1746080726991" duration="149000" />
       <workItem from="1747497757958" duration="16783000" />
-      <workItem from="1752155993927" duration="16127000" />
+      <workItem from="1752155993927" duration="24552000" />
     </task>
     <task id="LOCAL-00001" summary="Adjust logic">
       <option name="closed" value="true" />
@@ -219,7 +220,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752262630121</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Adjust Structure of processes and tests">
+      <option name="closed" value="true" />
+      <created>1752271507347</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1752271507347</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -257,7 +266,7 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/QPU$cli.coverage" NAME="cli Coverage Results" MODIFIED="1745043567409" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/QPU$.coverage" NAME=" Coverage Results" MODIFIED="1752268954822" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/QPU$.coverage" NAME=" Coverage Results" MODIFIED="1752278547971" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/QPU$main.coverage" NAME="main Coverage Results" MODIFIED="1745040491265" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

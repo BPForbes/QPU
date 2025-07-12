@@ -2,22 +2,21 @@
 PARAMS: A0:state A1:state B0:state B1:state Cin:state Sum0:int Sum1:int Cout:int
 MAIN-PROCESS TwoBitFullAdder
 DECLARECHILD SingleBitFullAdder
-CYCLE 2
+CYCLE 1
 CREATETOKEN -I Cmid
 SET Cmid:0 0p
 
-# bit0 at cycle 0
+# bit0 at cycle 1
 SET A0:0   $A0
 SET B0:0   $B0
 SET Cin:0  $Cin
 RUNCHILD SingleBitFullAdder -I $A0 $B0 $Cin -O Sum0 Cmid:0
 ACCEPTVALS Sum0 Cmid
 
-# bit1 at cycle1
-CYCLE 1
-SET A1:1   $A1
-SET B1:1   $B1
-RUNCHILD SingleBitFullAdder -I $A1 $B1 Cmid    -O Sum1 Cout:1
+#second part at send half of cycle
+SET A1:0   $A1
+SET B1:0   $B1
+RUNCHILD SingleBitFullAdder -I $A1 $B1 Cmid -O Sum1 Cout:1
 ACCEPTVALS Sum1 Cout
 
 DELETETOKEN -I Cmid
