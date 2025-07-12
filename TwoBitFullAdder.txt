@@ -2,8 +2,8 @@
 PARAMS: A0:state A1:state B0:state B1:state Cin:state Sum0:int Sum1:int Cout:int
 MAIN-PROCESS TwoBitFullAdder
 DECLARECHILD SingleBitFullAdder
-CYCLE 1
 CREATETOKEN -I Cmid
+
 SET Cmid:0 0p
 
 # bit0 at cycle 1
