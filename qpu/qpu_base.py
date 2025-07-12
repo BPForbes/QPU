@@ -365,6 +365,24 @@ class QuantumProcessorUnit:
         return bits, collapsed
 
     # ----------------------------------------------------------------
+    # State serialization helpers
+    # ----------------------------------------------------------------
+
+    def get_states(self):
+        return {
+            "local_states": [s.copy() for s in self.local_states],
+            "custom_states": {k: v.copy() for k, v in self.custom_states.items()},
+        }
+
+    def set_states(self, data):
+        self.local_states = [np.array(s) for s in data["local_states"]]
+        self.custom_states = {k: np.array(v) for k, v in data["custom_states"].items()}
+        self.rebuild_global_state()
+
+    def full_state_vector(self):
+        return self.state.copy()
+
+    # ----------------------------------------------------------------
     # Device‐fingerprint methods
     # ----------------------------------------------------------------
 

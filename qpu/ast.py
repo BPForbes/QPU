@@ -12,9 +12,24 @@ import hashlib
 import re
 import random
 import secrets
+from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 from qpu.qpu_base import QuantumProcessorUnit, X, Y, Z, H, format_qubit_state
+
+
+@dataclass
+class ClockFrame:
+    proc_name: str
+    base: int
+    local: int
+
+
+def hilbert_output(simulator, qubit_id, state_vector):
+    frame = simulator._clock_stack[-1]
+    current_global = frame.base + frame.local
+    simulator.hilbert.output(qubit_id, current_global, state_vector)
 
 # ------------------------------------------------------------------------
 # Helper: complete memory snapshot (for subprocesses)
@@ -275,6 +290,24 @@ class CycleASTNode:
         return f"CYCLE {self.n}"
 
 
+class IncreaseCycleASTNode:
+    def __init__(self, tokens):
+        if len(tokens) != 1:
+            raise ValueError("INCREASECYCLE takes no arguments")
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is None:
+            raise ValueError("INCREASECYCLE requires a simulator")
+        simulator.increase_cycle()
+        return "Cycle increased", None
+
+    def __repr__(self):
+        return "INCREASECYCLE"
+
+
 class MainProcessASTNode:
     """AST node for MAIN-PROCESS <name>."""
     def __init__(self, tokens):
@@ -317,7 +350,7 @@ class CreateTokenASTNode:
                 qpu.custom_states[name] = np.array([1, 0], dtype=complex)
             # record in memory and Hilbert outputs
             memory.setdefault(name, {})[0] = qpu.custom_states[name]
-            hilbert.output(name, 0, qpu.custom_states[name])
+            hilbert_output(simulator, name, qpu.custom_states[name])
             # track in simulator
             simulator.custom_tokens[name] = name
 
@@ -364,13 +397,18 @@ class DeleteTokenASTNode:
 class SetASTNode:
     def __init__(self, tokens):
         if len(tokens) != 2:
-            raise ValueError("SET requires 2 tokens")
+            raise ValueError("SET requires address and value")
         addr, val = tokens
         parts = addr.split(":")
-        if len(parts) != 2:
-            raise ValueError("SET address must be <q>:<cycle>")
-        k = int(parts[0]) if parts[0].isdigit() else parts[0]
-        self.key, self.cy, self.val = k, int(parts[1]), val
+        if len(parts) == 2:
+            k = int(parts[0]) if parts[0].isdigit() else parts[0]
+            self.key = k
+            self.cy = int(parts[1])
+        else:
+            k = int(addr) if addr.isdigit() else addr
+            self.key = k
+            self.cy = None
+        self.val = val
 
     def is_ready(self, *args):
         return True
@@ -400,8 +438,9 @@ class SetASTNode:
             for _ in range(K - 1):
                 state = np.kron(state, zero)
 
-        memory.setdefault(self.key, {})[self.cy] = state
-        hilbert.output(self.key, self.cy, state)
+        target_cycle = current_cycle
+        memory.setdefault(self.key, {})[target_cycle] = state
+        hilbert_output(simulator, self.key, state)
 
         if isinstance(self.key, int) and self.key < qpu.num_qubits:
             qpu.local_states[self.key] = state
@@ -410,7 +449,7 @@ class SetASTNode:
             qpu.custom_states[self.key] = state
             simulator.custom_tokens[self.key] = self.key
 
-        return f"SET {self.key}@{self.cy} → {format_qubit_state(state)}", state
+        return f"SET {self.key}@{target_cycle} → {format_qubit_state(state)}", state
 
     def __repr__(self):
         return f"SET {self.key}:{self.cy} {self.val}"
@@ -515,7 +554,7 @@ class CreateTokenASTNode:
             if simulator is not None:
                 simulator.custom_tokens[name] = name
             memory.setdefault(name, {})[0] = qpu.custom_states[name]
-            hilbert.output(name, 0, qpu.custom_states[name])
+            hilbert_output(simulator, name, qpu.custom_states[name])
 
         return f"CREATETOKEN created: {', '.join(self.names)}", None
 
@@ -586,7 +625,7 @@ class MeasureASTNode:
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
         def _commit(key, cycle, vec):
             memory.setdefault(key, {})[cycle] = vec
-            hilbert.output(key, cycle, vec)
+            hilbert_output(simulator, key, vec)
 
         if self.input_token:
             parts = self.input_token.split(":")
@@ -743,7 +782,7 @@ class JoinASTNode:
         if out_c is None:
             out_c = current_cycle
         memory.setdefault(out_k, {})[out_c] = joined
-        hilbert.output(out_k, out_c, joined)
+        hilbert_output(simulator, out_k, joined)
         qpu._update_register(out_k, joined)
         return f"JOIN → {format_qubit_state(joined)}", joined
 
@@ -783,7 +822,7 @@ class SplitASTNode:
 
         new_state = qpu.split_register(in_k, state, self.target_dim)
         memory.setdefault(out_k, {})[out_c] = new_state
-        hilbert.output(out_k, out_c, new_state)
+        hilbert_output(simulator, out_k, new_state)
         qpu._update_register(out_k, new_state)
         return f"SPLIT → {format_qubit_state(new_state)}", new_state
 
@@ -883,7 +922,7 @@ class DerivedGateASTNode:
 
         final = qpu.local_states[out_q]
         memory.setdefault(out_q, {})[out_c] = final
-        hilbert.output(out_q, out_c, final)
+        hilbert_output(simulator, out_q, final)
         return f"{self.gate} → {out_q}", final
 
     def __repr__(self):
@@ -917,7 +956,7 @@ class AndASTNode:
         tgt, tgt_cycle = self.output
         new_state = qpu.apply_ccnot(ctrl1, ctrl2, tgt)
         memory.setdefault(tgt, {})[tgt_cycle] = new_state
-        hilbert.output(tgt, tgt_cycle, new_state)
+        hilbert_output(simulator, tgt, new_state)
         return f"AND {ctrl1},{ctrl2} → {tgt}", new_state
 
     def __repr__(self):
@@ -959,7 +998,7 @@ class OrASTNode:
         new_state = qpu.local_states[self.target_qubit]
         out_k, out_c = self.output
         memory.setdefault(out_k, {})[out_c] = new_state
-        hilbert.output(out_k, out_c, new_state)
+        hilbert_output(simulator, out_k, new_state)
         return f"OR {ctrl1},{ctrl2} → {out_k}", new_state
 
     def __repr__(self):
@@ -1008,6 +1047,52 @@ class AcceptValsASTNode:
 
     def __repr__(self):
         return "ACCEPTVALS " + " ".join(self.locals)
+
+
+class SaveStateASTNode:
+    def __init__(self, tokens):
+        if len(tokens) != 2:
+            raise ValueError("SAVE_STATE requires a label")
+        self.label = tokens[1]
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is None:
+            raise ValueError("SAVE_STATE requires a simulator")
+        simulator.checkpoints[self.label] = {
+            "qpu_states": qpu.get_states(),
+            "memory": deepcopy(memory),
+            "clock_stack": deepcopy(simulator._clock_stack),
+        }
+        hilbert_output(simulator, "checkpoint", qpu.full_state_vector())
+        return f"Saved state '{self.label}'", None
+
+    def __repr__(self):
+        return f"SAVE_STATE {self.label}"
+
+
+class LoadStateASTNode:
+    def __init__(self, tokens):
+        if len(tokens) != 2:
+            raise ValueError("LOAD_STATE requires a label")
+        self.label = tokens[1]
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is None or self.label not in simulator.checkpoints:
+            raise ValueError("Unknown checkpoint")
+        cp = simulator.checkpoints[self.label]
+        qpu.set_states(cp["qpu_states"])
+        simulator.memory = deepcopy(cp["memory"])
+        simulator._clock_stack = deepcopy(cp["clock_stack"])
+        return f"Loaded state '{self.label}'", None
+
+    def __repr__(self):
+        return f"LOAD_STATE {self.label}"
 
 
 class DeclareChildASTNode:
@@ -1131,7 +1216,7 @@ class GateASTNode:
             # record the post‐gate state
             cyc = out_c if out_c is not None else current_cycle
             memory.setdefault(out_k, {})[cyc] = new
-            hilbert.output(out_k, cyc, new)
+            hilbert_output(simulator, out_k, new)
             return f"CNOT {ctrl}→{out_k}", new
 
         # --- fast‐path CCNOT (Toffoli) ---
@@ -1141,7 +1226,7 @@ class GateASTNode:
             new = qpu.apply_ccnot(c1, c2, out_k)
             cyc = out_c if out_c is not None else current_cycle
             memory.setdefault(out_k, {})[cyc] = new
-            hilbert.output(out_k, cyc, new)
+            hilbert_output(simulator, out_k, new)
             return f"CCNOT {c1},{c2}→{out_k}", new
 
         # --- fallback to the generic gate‐handler path ---
@@ -1166,7 +1251,7 @@ class GateASTNode:
         msg, comp = info["handler"](qpu, ins, out_k, self.param)
         cyc = out_c or current_cycle
         memory.setdefault(out_k, {})[cyc] = comp
-        hilbert.output(out_k, cyc, comp)
+        hilbert_output(simulator, out_k, comp)
         return msg, comp
 
 
@@ -1202,6 +1287,8 @@ def parse_command(command_str: str):
 
     if cmd == "CYCLE":
         return CycleASTNode(tokens)
+    if cmd == "INCREASECYCLE":
+        return IncreaseCycleASTNode(tokens)
     if cmd == "COMPILEPROCESS":
         return CompileASTNode(tokens)
     if cmd == "FREE":
@@ -1261,6 +1348,10 @@ def parse_command(command_str: str):
         return ReturnValsASTNode(tokens)
     if cmd == "ACCEPTVALS":
         return AcceptValsASTNode(tokens)
+    if cmd == "SAVE_STATE":
+        return SaveStateASTNode(tokens)
+    if cmd == "LOAD_STATE":
+        return LoadStateASTNode(tokens)
     if cmd == "MAIN-PROCESS":
         return MainProcessASTNode(tokens)
     if cmd == "CREATETOKEN":

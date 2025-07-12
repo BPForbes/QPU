@@ -148,5 +148,21 @@ class TestGateHilbert(unittest.TestCase):
         np.testing.assert_allclose(hilbert.space[(1,0)], np.array([0,1], dtype=complex))
 
 
+class TestCycleMechanics(unittest.TestCase):
+    def test_increasecycle(self):
+        sim = CircuitSimulator(QuantumProcessorUnit(num_qubits=2))
+        start = sim.current_cycle
+        parse_command("INCREASECYCLE").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        self.assertEqual(sim.current_cycle, start + 1)
+
+    def test_save_and_load_state(self):
+        sim = CircuitSimulator(QuantumProcessorUnit(num_qubits=1))
+        parse_command("SET 0 1p").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        parse_command("SAVE_STATE snap").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        parse_command("SET 0 0p").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        parse_command("LOAD_STATE snap").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+        np.testing.assert_allclose(sim.qpu.local_states[0], np.array([0.0,1.0], dtype=complex))
+
+
 if __name__ == "__main__":
     unittest.main()

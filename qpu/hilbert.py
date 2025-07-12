@@ -29,6 +29,10 @@ class HilbertSpace:
         """
         self.space[(register, cycle)] = value
 
+    def output_all(self, cycle: int, value):
+        """Record a full-system snapshot under key '__all__'."""
+        self.space[("__all__", cycle)] = value
+
     def input(self, register, cycle: int):
         """
         Retrieves and removes the value stored under (register, cycle).
