@@ -13,7 +13,9 @@ from qpu.ast import (
     assign_parameter_values,
     substitute_parameters,
     readdress_value,
+    ClockFrame,
 )
+from dataclasses import dataclass
 from qpu.hilbert import HilbertSpace
 from qpu.qpu_base import QuantumProcessorUnit, format_qubit_state
 import numpy as np
@@ -67,10 +69,12 @@ class CircuitSimulator:
     def __init__(self, qpu: QuantumProcessorUnit):
         self.qpu = qpu
         self.memory = {}
-        self.current_cycle = 1
         self.ast_nodes = []
         self.hilbert = HilbertSpace()
         self.max_cycles = qpu.num_qubits + 1
+
+        self._clock_stack = [ClockFrame("__main__", base=0, local=0)]
+        self.checkpoints = {}
 
         # compiled processes registry
         self.compiled_processes = {}
@@ -87,6 +91,20 @@ class CircuitSimulator:
         # child‑process support
         self.child_return_keys = []
         self.last_child_returns = {}
+
+    # Clock helpers
+    @property
+    def current_cycle(self):
+        frame = self._clock_stack[-1]
+        return frame.base + frame.local
+
+    @current_cycle.setter
+    def current_cycle(self, value):
+        frame = self._clock_stack[-1]
+        frame.local = value - frame.base
+
+    def increase_cycle(self):
+        self._clock_stack[-1].local += 1
 
     def prune_cycles(self):
         for k in list(self.memory):
@@ -114,7 +132,7 @@ class CircuitSimulator:
                 except Exception as e:
                     if not suppress_output:
                         print(color_text(f"✗ {node}: {e}","red"))
-        self.current_cycle += 1
+        self.increase_cycle()
 
     def free_memory_entries(self, entries):
         msgs = []
@@ -176,22 +194,24 @@ class CircuitSimulator:
                 self.custom_tokens[token] = token
 
         # run child lines in isolated local cycle space
-        local_cycle = self.current_cycle
+        start_global = self.current_cycle
+        self._clock_stack.append(ClockFrame(name, base=start_global, local=0))
 
         for L in lines:
             t = L.strip()
             if not t or t.upper().startswith(("PARAMS:", "#", "/*")):
                 continue
             node = parse_command(t)
-            node.evaluate(self.memory, local_cycle, self.qpu, self.hilbert, self)
-            local_cycle += 1
+            node.evaluate(self.memory, self.current_cycle, self.qpu, self.hilbert, self)
+            self.increase_cycle()
 
         # gather return values from final local cycle
         ret_vals = []
         from qpu.ast import interpret_token
+        final_cycle = self.current_cycle - 1
         for key in self.child_return_keys:
             k = interpret_token(key)
-            val = readdress_value(self.memory, k, local_cycle - 1, self.qpu)
+            val = readdress_value(self.memory, k, final_cycle, self.qpu)
             ret_vals.append(val)
 
         # Collect updated states of injected parent tokens, only if changed
@@ -209,6 +229,8 @@ class CircuitSimulator:
                 del self.qpu.custom_states[token]
             if token in self.custom_tokens:
                 del self.custom_tokens[token]
+
+        self._clock_stack.pop()
 
         return ret_vals, updated_tokens
 
