@@ -29,7 +29,6 @@ Arguments typically use the form `qubit:cycle`, where the cycle component is opt
 ## AST Overview
 
 Each command maps to an AST node in `qpu/ast.py`. During simulation every node checks `is_ready` and, once ready, `evaluate` executes it. Key node types include:
-
 - `SetASTNode` for `SET` commands.
 - `CycleASTNode` to advance the clock.
 - `CompileASTNode` and `CallASTNode` for process management.
@@ -53,6 +52,7 @@ H -I 0:0 -O 0:0
 CNOT -I 0:0 -O 1:0
 MEASURE -I 1
 ```
+
 
 ## Process Compilation and Parameters
 
@@ -78,7 +78,6 @@ Compile and run via the CLI:
 COMPILEPROCESS --NAME Example Example.txt
 RUNPROCESS --NAME Example 1p 0p 0p 0
 ```
-
 ## Gate Reference
 
 Primitive single-qubit gates and multi-qubit controls are listed below along with their matrices.  Tables describe how each gate acts on computational basis states.
@@ -159,6 +158,37 @@ The 4×4 matrix for CNOT is
 \end{bmatrix}
 ```
 
+=======
+```math
+\begin{bmatrix}
+1 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 1 \\
+0 & 0 & 1 & 0
+\end{bmatrix}
+```
+
+| A (control) | B (target in) | B (out) |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+### Toffoli (CCNOT)
+
+```math
+\begin{bmatrix}
+1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 \\
+0 & 0 & 0 & 0 & 0 & 0 & 1 & 0
+\end{bmatrix}
+```
 | A | B | T (in) | T (out) |
 |---|---|---|---|
 | 0 | 0 | 0 | 0 |
