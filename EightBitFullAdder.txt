@@ -5,7 +5,8 @@ PARAMS: A0:state A1:state A2:state A3:state A4:state A5:state A6:state A7:state 
         B0:state B1:state B2:state B3:state B4:state B5:state B6:state B7:state \
         Cin:state
 MAIN-PROCESS EightBitFullAdder
-CYCLE 2
+INCREASECYCLE
+INCREASECYCLE
 CREATETOKEN -I C1 C2 Cout S0 S1 S2 S3 S4 S5 S6 S7 SUM
 
 # load operands

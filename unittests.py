@@ -26,7 +26,7 @@ def run_process(proc_file, proc_name, params):
     return sim
 
 # -------------------------------------------------------------------
-# Single‐Bit Full Adder Tests (one test method per input combo)
+# Single‑Bit Full Adder Tests (auto‑generated via product + enumerate)
 # -------------------------------------------------------------------
 class TestSingleBitAdder(unittest.TestCase):
     zero = np.array([1.0, 0.0], dtype=complex)
@@ -34,15 +34,22 @@ class TestSingleBitAdder(unittest.TestCase):
     proc_file = os.path.join(os.path.dirname(__file__), "SingleBitFullAdder.txt")
     proc_name = "SingleBitFullAdder"
 
+    @staticmethod
+    def expected(A, B, Cin):
+        # Sum = A ⊕ B ⊕ Cin
+        a, b, c = int(A[0]), int(B[0]), int(Cin[0])
+        s = a ^ b ^ c
+        # Cout = majority(a, b, c)
+        cout = 1 if (a + b + c) >= 2 else 0
+        return (
+            TestSingleBitAdder.one if s else TestSingleBitAdder.zero,
+            TestSingleBitAdder.one if cout else TestSingleBitAdder.zero,
+        )
+
+_bits = ["0p", "1p"]
 _single_bit_combos = [
-    ("0p","0p","0p", TestSingleBitAdder.zero, TestSingleBitAdder.zero),
-    ("0p","0p","1p", TestSingleBitAdder.one,  TestSingleBitAdder.zero),
-    ("0p","1p","0p", TestSingleBitAdder.one,  TestSingleBitAdder.zero),
-    ("0p","1p","1p", TestSingleBitAdder.zero, TestSingleBitAdder.one),
-    ("1p","0p","0p", TestSingleBitAdder.one,  TestSingleBitAdder.zero),
-    ("1p","0p","1p", TestSingleBitAdder.zero, TestSingleBitAdder.one),
-    ("1p","1p","0p", TestSingleBitAdder.zero, TestSingleBitAdder.one),
-    ("1p","1p","1p", TestSingleBitAdder.one,  TestSingleBitAdder.one),
+    (A, B, Cin, *TestSingleBitAdder.expected(A, B, Cin))
+    for A, B, Cin in product(_bits, repeat=3)
 ]
 
 def _make_single_bit_test(A, B, Cin, exp_sum, exp_cout):
@@ -52,6 +59,7 @@ def _make_single_bit_test(A, B, Cin, exp_sum, exp_cout):
             TestSingleBitAdder.proc_name,
             [A, B, Cin],
         )
+        # result is written into registers 3 (sum) and 4 (cout)
         s_cycle = max(sim.memory[3].keys())
         c_cycle = max(sim.memory[4].keys())
         s = sim.memory[3][s_cycle]
@@ -61,12 +69,12 @@ def _make_single_bit_test(A, B, Cin, exp_sum, exp_cout):
     return test
 
 for idx, combo in enumerate(_single_bit_combos):
-    name = f"test_single_bit_{idx}_{combo[0]}_{combo[1]}_{combo[2]}"
-    setattr(TestSingleBitAdder, name, _make_single_bit_test(*combo))
-
+    A, B, Cin, exp_s, exp_c = combo
+    name = f"test_single_bit_{idx}_{A}_{B}_{Cin}"
+    setattr(TestSingleBitAdder, name, _make_single_bit_test(A, B, Cin, exp_s, exp_c))
 
 # -------------------------------------------------------------------
-# Two‐Bit Full Adder Tests (one test method per input combo)
+# Two‑Bit Full Adder Tests (one test method per input combo)
 # -------------------------------------------------------------------
 class TestTwoBitAdder(unittest.TestCase):
     zero = np.array([1.0, 0.0], dtype=complex)
@@ -89,7 +97,6 @@ class TestTwoBitAdder(unittest.TestCase):
             TestTwoBitAdder.one  if cout else TestTwoBitAdder.zero,
         )
 
-_bits = ["0p", "1p"]
 _two_bit_combos = [
     (A0, A1, B0, B1, Cin, *TestTwoBitAdder.expected(A0, A1, B0, B1, Cin))
     for A0, A1, B0, B1, Cin in product(_bits, repeat=5)
@@ -118,9 +125,8 @@ for idx, combo in enumerate(_two_bit_combos):
     name = f"test_two_bit_{idx}_{A0}{A1}_{B0}{B1}_{Cin}"
     setattr(TestTwoBitAdder, name, _make_two_bit_test(*combo))
 
-
 # -------------------------------------------------------------------
-# Four‐Bit Full Adder Tests (one test method per input combo)
+# Four‑Bit Full Adder Tests (one test method per input combo)
 # -------------------------------------------------------------------
 class TestFourBitAdder(unittest.TestCase):
     zero = np.array([1.0, 0.0], dtype=complex)
@@ -148,7 +154,9 @@ class TestFourBitAdder(unittest.TestCase):
         )
 
 _four_bit_combos = [
-    (A0, A1, A2, A3, B0, B1, B2, B3, Cin, *TestFourBitAdder.expected(A0, A1, A2, A3, B0, B1, B2, B3, Cin))
+    (A0, A1, A2, A3, B0, B1, B2, B3, Cin, *TestFourBitAdder.expected(
+        A0, A1, A2, A3, B0, B1, B2, B3, Cin
+    ))
     for A0, A1, A2, A3, B0, B1, B2, B3, Cin in product(_bits, repeat=9)
 ]
 
@@ -180,7 +188,6 @@ for idx, combo in enumerate(_four_bit_combos):
     name = f"test_four_bit_{idx}_" + "".join(combo[:9])
     setattr(TestFourBitAdder, name, _make_four_bit_test(*combo))
 
-
 # -------------------------------------------------------------------
 # Direct gate interaction with Hilbert space
 # -------------------------------------------------------------------
@@ -196,7 +203,6 @@ class TestGateHilbert(unittest.TestCase):
 
         self.assertIn((1, 0), hilbert.space)
         np.testing.assert_allclose(hilbert.space[(1,0)], np.array([0,1], dtype=complex))
-
 
 # -------------------------------------------------------------------
 # Cycle mechanics & state snapshot tests
@@ -215,7 +221,6 @@ class TestCycleMechanics(unittest.TestCase):
         parse_command("SET 0 0p").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
         parse_command("LOAD_STATE snap").evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
         np.testing.assert_allclose(sim.qpu.local_states[0], np.array([0.0,1.0], dtype=complex))
-
 
 if __name__ == "__main__":
     unittest.main()
