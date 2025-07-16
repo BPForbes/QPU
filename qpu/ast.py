@@ -999,7 +999,7 @@ class OrASTNode:
         ctrl1,_ = self.inputs[0]
         ctrl2,_ = self.inputs[1]
         qpu.apply_single_qubit_gate(X, ctrl1)
-        qpu.apply_single_qubit_gatee(X, ctrl2)
+        qpu.apply_single_qubit_gate(X, ctrl2)
         qpu.apply_ccnot(ctrl1, ctrl2, self.target_qubit)
         qpu.apply_single_qubit_gate(X, ctrl1)
         qpu.apply_single_qubit_gate(X, ctrl2)
