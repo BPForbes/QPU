@@ -242,24 +242,24 @@ def run_single_process(cmd_line, sim: CircuitSimulator):
     if "--NAME" not in U:
         print(color_text("RUNPROCESS needs --NAME","red"))
         return
-    name = parts[U.index("--NAME")+1]
+    idx = U.index("--NAME")
+    name = parts[idx + 1]
+    args = parts[idx + 2 :]
     if name not in sim.compiled_processes:
         print(color_text(f"Process '{name}' not compiled","red"))
         return
 
-    lines = sim.compiled_processes[name]["lines"]
+    info = sim.compiled_processes[name]
+    lines = list(info["lines"])
+
+    if info.get("param_defs"):
+        assigns = assign_parameter_values(info["param_defs"], args)
+        lines = substitute_parameters(lines, assigns)
     print(color_text(f"--- Process '{name}' START ---","magenta"))
 
     for L in lines:
         t = L.strip()
         if not t or t.upper().startswith(("PARAMS:","#","/*")):
-            continue
-        if t.upper().startswith("CYCLE"):
-            _,nstr = t.split()
-            n = int(nstr)
-            print(color_text(f"[Process] Advancing {n} cycles","cyan"))
-            for _ in range(n):
-                sim.run_cycle()
             continue
 
         print(color_text(f"[Process] {t}","blue"))
