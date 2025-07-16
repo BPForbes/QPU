@@ -29,9 +29,8 @@ Arguments typically use the form `qubit:cycle`, where the cycle component is opt
 ## AST Overview
 
 Each command maps to an AST node in `qpu/ast.py`. During simulation every node checks `is_ready` and, once ready, `evaluate` executes it. Key node types include:
-
 - `SetASTNode` for `SET` commands.
-- `IncreaseCycleASTNode` to advance the clock.
+- `CycleASTNode` to advance the clock.
 - `CompileASTNode` and `CallASTNode` for process management.
 - `MainProcessASTNode` marks the entry routine.
 - `DeclareChildASTNode` and `RunChildASTNode` for spawning subprocesses.
