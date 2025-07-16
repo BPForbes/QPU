@@ -24,8 +24,8 @@ The overall parser workflow:
 ## Command Syntax
 
 ### Control & Process Nodes
-- **`CYCLE n`**  
-  Advance the simulator by `n` full clock cycles.  
+- **`INCREASECYCLE`**  
+  Advance the simulator by a cycle. See below for more details  
   → `CycleASTNode`  
 - **`MAIN-PROCESS name`**  
   Identify and switch to the main execution context.  
@@ -78,6 +78,15 @@ CCNOT/CCX                    # Toffoli
 PHASE=θ  -I q[:c] -O out[:c′]   # Z-rotation by θ radians  
 ````
 
+### Set System to declare qubit data (essentially varible assignment)
+Handled by the SetASTNode
+```bash
+SET 0:0 $A0 #Uses the "$" which is the parameter pass. Here A0 is the parameter and is used for assignment of the address 0:0. 
+SET 1:0 1p #Sets address 1:0 to a ket1 measured state
+SET 2:0 0p #Sets address 2:0 to a ket0 measured state
+SET 3:0 Sp #Sets address 3:0 to a superpostion state. 
+```
+
 * **`-I`** lists input qubit tokens; **`-O`** specifies the target/output qubit.
 * Numeric tokens (e.g. `0`, `1`) refer to physical qubits; string tokens remain custom registers. 
 ```bash
@@ -89,6 +98,7 @@ Cycle counter cannot revert unless we use the SAVESTATE or LOADSTATE operations 
 ```
 is a snapshot of time which points to a reference of memory. Addresses can be referenced from the past and updated into present. Ie if we CNOT on an address 3:0 (address is id =3 and last refencene cycle address is 0) while present cycle is 2, we do the operation on address 3:0, but update the address to 3:2. The updating of the address from 3:0 to 3:2 is pulling it from the past cycle of 0 to the present cycle of 2. Time is linear in the system, so as we said we can operate on memery (addresses) in the past (or future) and update them as so, but cannot declare addresses in past or futore cycle count.  
 
+If cycle count is 0 (default) we cannot declare any qubit addresses that are not <id>:0. Ie 
 ### Derived Gates
 
 Convenience macros via `DerivedGateASTNode`:
