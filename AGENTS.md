@@ -78,6 +78,10 @@ CCNOT/CCX                    # Toffoli
 PHASE=θ  -I q[:c] -O out[:c′]   # Z-rotation by θ radians  
 ````
 
+* **`-I`** lists input qubit tokens; **`-O`** specifies the target/output qubit.
+* Numeric tokens (e.g. `0`, `1`) refer to physical qubits; string tokens remain custom registers. 
+```bash
+
 ### Set System to declare qubit data (essentially varible assignment)
 Handled by the SetASTNode
 ```bash
@@ -86,19 +90,29 @@ SET 1:0 1p #Sets address 1:0 to a ket1 measured state
 SET 2:0 0p #Sets address 2:0 to a ket0 measured state
 SET 3:0 Sp #Sets address 3:0 to a superpostion state. 
 ```
-
-* **`-I`** lists input qubit tokens; **`-O`** specifies the target/output qubit.
-* Numeric tokens (e.g. `0`, `1`) refer to physical qubits; string tokens remain custom registers. 
-```bash
+### Cycle management system which denotes cycles work only in the present and memory can be referenced from the past and can be pulled into the future. Also notes Memory can never work in the future. 
+```
 INCREASECYCLE : This increases the cycle count by 1 and cycle counter begins at 0.
 ```
-Cycle counter cannot revert unless we use the SAVESTATE or LOADSTATE operations to take a snapshot intime. Each 
+Cycle counter cannot revert unless we use the SAVESTATE or LOADSTATE operations to take a snapshot intime. Each
 ```
 <address> = <id>:<cycle>
 ```
 is a snapshot of time which points to a reference of memory. Addresses can be referenced from the past and updated into present. Ie if we CNOT on an address 3:0 (address is id =3 and last refencene cycle address is 0) while present cycle is 2, we do the operation on address 3:0, but update the address to 3:2. The updating of the address from 3:0 to 3:2 is pulling it from the past cycle of 0 to the present cycle of 2. Time is linear in the system, so as we said we can operate on memery (addresses) in the past (or future) and update them as so, but cannot declare addresses in past or futore cycle count.  
 
-If cycle count is 0 (default) we cannot declare any qubit addresses that are not <id>:0. Ie 
+If cycle count is 0 (default) we cannot declare any qubit addresses that are not <id>:0. 
+
+Example:
+
+cycle = 0 so we cannot 
+```bash
+SET 0:1 1p
+SET 1:2 Sp
+SET 1:5 0p 
+```
+etc.
+As those cycle counts of 1, 2, 5, etc. are greater than 0. Since cycle counter can only increase (by one each time) it will never be negative and will always be an integer. So, addresses like 0:-3 are invalid as well. If we did a `INCREASECYCLE` we could operate on both addresses with cycle of 1 or 0, but only declare on cycle 1. So when cycle=1, `SET 0:1 1p` is valid as its in the present, SET 1:0 1p is invalid as its in the past, SET 1:2 Sp is invalid as its in the future. If address 1:0 was declared in the past during cycle 0, but we `INCREASECYCLE` (now cycle=1), we can operate on 1:0 to bring it to the present ie we could apply a pauli gate on 1:0 with another address in cycle 1 and bring it into the present of cycle one; after the operation the address of 1:0 is updated from 1:0 to 1:1. This update mechisms is important as we cannot have two ids at different cycle numbers, if we have a 16 qubit system there will always be 16 qubits to work with. 
+
 ### Derived Gates
 
 Convenience macros via `DerivedGateASTNode`:
@@ -160,5 +174,6 @@ To help Codex or other AI agents generate, complete, and refactor QPU `.txt` pro
    * Keep linear, cycle-by-cycle logic simple; prefer explicit cycle annotations for clarity.
    * Group related operations into subprocess files, compiled and invoked via `COMPILEPROCESS`/`CALL`.
    * Use derived gates (`AND`, `OR`, etc.) sparingly; inline primitive gate sequences can be clearer.
+   * Do INCREASECYCLE to make sure addresses are in the present and are not in the future. Do not declare addresses in the future or past with regard to the present current preasent cycle. Do not   
 
 By adhering to these conventions, AI agents can reliably author syntactically correct, semantically meaningful QPU instruction files that parse cleanly through `qpu/ast.py` and execute on the Python QPU simulator.
