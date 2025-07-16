@@ -418,25 +418,34 @@ class SetASTNode:
             simulator.custom_tokens = {}
 
         m = re.match(r"^(0p|1p|sp)(?:_dim(\d+))?$", self.val.lower())
-        if not m:
-            raise ValueError(f"Invalid SET value: {self.val}")
-        base, dim_s = m.groups()
-        base = base.lower()
-        if base == "0p":
-            state = np.array([1.0, 0.0], dtype=complex)
-        elif base == "1p":
-            state = np.array([0.0, 1.0], dtype=complex)
-        else:
-            amp0 = secrets.SystemRandom().random() + 1j * secrets.SystemRandom().random()
-            amp1 = secrets.SystemRandom().random() + 1j * secrets.SystemRandom().random()
-            vec = np.array([amp0, amp1], dtype=complex)
-            state = vec / np.linalg.norm(vec)
+        if m:
+            base, dim_s = m.groups()
+            base = base.lower()
+            if base == "0p":
+                state = np.array([1.0, 0.0], dtype=complex)
+            elif base == "1p":
+                state = np.array([0.0, 1.0], dtype=complex)
+            else:
+                amp0 = secrets.SystemRandom().random() + 1j * secrets.SystemRandom().random()
+                amp1 = secrets.SystemRandom().random() + 1j * secrets.SystemRandom().random()
+                vec = np.array([amp0, amp1], dtype=complex)
+                state = vec / np.linalg.norm(vec)
 
-        if dim_s:
-            K = int(dim_s)
-            zero = np.array([1.0, 0.0], dtype=complex)
-            for _ in range(K - 1):
-                state = np.kron(state, zero)
+            if dim_s:
+                K = int(dim_s)
+                zero = np.array([1.0, 0.0], dtype=complex)
+                for _ in range(K - 1):
+                    state = np.kron(state, zero)
+        else:
+            # interpret value as a reference to an existing register
+            if ":" in self.val:
+                k_str, c_str = self.val.split(":", 1)
+                ref_key = int(k_str) if k_str.isdigit() else k_str
+                ref_cycle = int(c_str)
+            else:
+                ref_key = int(self.val) if self.val.isdigit() else self.val
+                ref_cycle = current_cycle
+            state = readdress_value(memory, ref_key, ref_cycle, qpu)
 
         target_cycle = current_cycle
         memory.setdefault(self.key, {})[target_cycle] = state
@@ -1038,9 +1047,10 @@ class AcceptValsASTNode:
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
         mapping = simulator.last_child_returns
         for lk, rv in zip(self.locals, mapping.values()):
-            memory.setdefault(lk, {})[current_cycle] = rv
+            copied = rv.copy() if hasattr(rv, 'copy') else rv
+            memory[lk] = {current_cycle: copied}
             if qpu is not None and isinstance(lk, str):
-                qpu.custom_states[lk] = rv
+                qpu.custom_states[lk] = copied
                 if simulator is not None:
                     simulator.custom_tokens[lk] = lk
         return f"Accepted {list(mapping.keys())} → {self.locals}", None
