@@ -53,6 +53,31 @@ CNOT -I 0:0 -O 1:0
 MEASURE -I 1
 ```
 
+
+## Process Compilation and Parameters
+
+Processes live in plain text files. Use `COMPILEPROCESS` to parse and store a
+process, then `RUNPROCESS` to execute it. The optional `PARAMS:` header lists
+arguments in order. Types include `state` (token of a qubit) and `int`.
+Missing arguments default to `0p` or `0` depending on the type.  Placeholders
+are written as `$Name` in the script.
+
+```
+PARAMS: A0:state A1:state Cin:state Sum:int
+MAIN-PROCESS Example
+SET A0:0 $A0
+SET A1:0 $A1
+INCREASECYCLE
+SET Cin:0 $Cin
+RETURNVALS Sum
+```
+
+Compile and run via the CLI:
+
+```
+COMPILEPROCESS --NAME Example Example.txt
+RUNPROCESS --NAME Example 1p 0p 0p 0
+```
 ## Gate Reference
 
 Primitive single-qubit gates and multi-qubit controls are listed below along with their matrices.  Tables describe how each gate acts on computational basis states.
@@ -133,6 +158,37 @@ The 4×4 matrix for CNOT is
 \end{bmatrix}
 ```
 
+=======
+```math
+\begin{bmatrix}
+1 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 1 \\
+0 & 0 & 1 & 0
+\end{bmatrix}
+```
+
+| A (control) | B (target in) | B (out) |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+### Toffoli (CCNOT)
+
+```math
+\begin{bmatrix}
+1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 \\
+0 & 0 & 0 & 0 & 0 & 0 & 1 & 0
+\end{bmatrix}
+```
 | A | B | T (in) | T (out) |
 |---|---|---|---|
 | 0 | 0 | 0 | 0 |

@@ -147,9 +147,15 @@ def parse_parameters(def_line: str):
 
 def assign_parameter_values(param_defs, provided_values):
     assignments = {}
-    for i, (name, _) in enumerate(param_defs):
+    for i, (name, typ) in enumerate(param_defs):
         if i < len(provided_values):
             assignments[name] = provided_values[i]
+        else:
+            # basic defaults if caller omits parameters
+            if typ.lower() == "state":
+                assignments[name] = "0p"
+            else:
+                assignments[name] = "0"
     return assignments
 
 
