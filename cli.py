@@ -87,7 +87,6 @@ class CircuitSimulator:
 
         # history for runtime fingerprinting
         self.runtime_history = []
-
         # per-process stack of SET locks
         self._lock_stack = [set()]
 
@@ -147,6 +146,7 @@ class CircuitSimulator:
                 msgs.append(f"{k}@{c} freed")
         return ", ".join(msgs)
 
+    # ——— child‑process support —————————————————————————————————————
     def lock_id(self, key):
         self._lock_stack[-1].add(key)
 
@@ -166,6 +166,8 @@ class CircuitSimulator:
     def clear_locks(self):
         self._lock_stack[-1].clear()
 
+    
+    
     def get_runtime_history_string(self):
         return "\n".join(self.runtime_history)
 
