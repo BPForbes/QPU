@@ -22,4 +22,5 @@ CCNOT -I 1:0 2:0 -O 4:0
 MEASURE -I 3
 MEASURE -I 4
 
+# return individual Sum and Cout registers
 RETURNVALS 3 4
