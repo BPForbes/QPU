@@ -161,7 +161,21 @@ class CircuitSimulator:
 
     def end_process(self):
         if len(self._lock_stack) > 1:
-            self._lock_stack.pop()
+            to_unlock = self._lock_stack.pop()
+
+            # reset each unlocked ID to |0> at the current cycle
+            for qid in to_unlock:
+                zero_state = np.array([1.0, 0.0], dtype=complex)
+                # update QPU internal state
+                self.qpu.custom_states[qid] = zero_state
+                # record in memory and Hilbert output
+                cyc = self.current_cycle
+                self.memory.setdefault(qid, {})[cyc] = zero_state
+                self.hilbert.output(qid, cyc, zero_state)
+                # remove from custom_tokens so it can be reallocated
+                self.custom_tokens.pop(qid, None)
+
+
 
     def clear_locks(self):
         self._lock_stack[-1].clear()

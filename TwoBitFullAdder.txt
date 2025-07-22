@@ -21,5 +21,4 @@ RUNCHILD SingleBitFullAdder -I $A1 $B1 Cmid -O S1tmp Cout
 ACCEPTVALS S1tmp Cout
 SET Sum1 S1tmp
 
-DELETETOKEN -I Cmid S0tmp S1tmp
 RETURNVALS S0tmp S1tmp Cout
