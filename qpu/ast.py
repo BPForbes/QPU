@@ -147,9 +147,15 @@ def parse_parameters(def_line: str):
 
 def assign_parameter_values(param_defs, provided_values):
     assignments = {}
-    for i, (name, _) in enumerate(param_defs):
+    for i, (name, typ) in enumerate(param_defs):
         if i < len(provided_values):
             assignments[name] = provided_values[i]
+        else:
+            # basic defaults if caller omits parameters
+            if typ.lower() == "state":
+                assignments[name] = "0p"
+            else:
+                assignments[name] = "0"
     return assignments
 
 
@@ -272,26 +278,6 @@ gate_handlers = {
 
 class CycleASTNode:
     def __init__(self, tokens):
-        if len(tokens) != 2:
-            raise ValueError("CYCLE requires exactly 1 argument")
-        self.n = int(tokens[1])
-
-    def is_ready(self, *args):
-        return True
-
-    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
-        if simulator is None or not hasattr(simulator, "run_cycle"):
-            raise ValueError("CYCLE requires a simulator")
-        for _ in range(self.n):
-            simulator.run_cycle(suppress_output=True)
-        return f"Advanced {self.n} cycles", None
-
-    def __repr__(self):
-        return f"CYCLE {self.n}"
-
-
-class IncreaseCycleASTNode:
-    def __init__(self, tokens):
         if len(tokens) != 1:
             raise ValueError("INCREASECYCLE takes no arguments")
 
@@ -327,12 +313,10 @@ class MainProcessASTNode:
 
 class CreateTokenASTNode:
     def __init__(self, tokens):
-        # Syntax: CREATETOKEN -I name1 name2 ...
-        if not tokens or tokens[0].upper() != "-I":
-            raise ValueError("CREATETOKEN requires -I followed by token names")
-        self.names = tokens[1:]
-        if not self.names:
-            raise ValueError("CREATETOKEN requires at least one token name after -I")
+        # tokens are the names following -I
+        if not tokens:
+            raise ValueError("CREATETOKEN requires at least one token name")
+        self.names = tokens[:]
 
     def is_ready(self, *args):
         return True
@@ -362,12 +346,10 @@ class CreateTokenASTNode:
 
 class DeleteTokenASTNode:
     def __init__(self, tokens):
-        # Syntax: DELETETOKEN -I name1 name2 ...
-        if not tokens or tokens[0].upper() != "-I":
-            raise ValueError("DELETETOKEN requires -I followed by token names")
-        self.names = tokens[1:]
-        if not self.names:
-            raise ValueError("DELETETOKEN requires at least one token name after -I")
+        # tokens are the names following -I
+        if not tokens:
+            raise ValueError("DELETETOKEN requires at least one token name")
+        self.names = tokens[:]
 
     def is_ready(self, *args):
         return True
@@ -380,13 +362,12 @@ class DeleteTokenASTNode:
             simulator.custom_tokens = {}
 
         for name in self.names:
-            if name not in simulator.custom_tokens:
+            if simulator and name not in simulator.custom_tokens:
                 raise ValueError(f"Token '{name}' not found")
-            # remove from qpu and memory
-            qpu.custom_states.pop(name, None)
-            memory.pop(name, None)
-            # remove from simulator
-            simulator.custom_tokens.pop(name, None)
+            if name in qpu.custom_states:
+                del qpu.custom_states[name]
+            if simulator:
+                del simulator.custom_tokens[name]
 
         return f"DELETETOKEN deleted: {', '.join(self.names)}", None
 
@@ -545,55 +526,6 @@ class CompileASTNode:
         return s
 
 
-class CreateTokenASTNode:
-    def __init__(self, tokens):
-        if tokens and tokens[0].upper() == "-I":
-            tokens = tokens[1:]
-        if not tokens:
-            raise ValueError("CREATETOKEN requires at least one token")
-        self.names = tokens[:]
-
-    def is_ready(self, *args):
-        return True
-
-    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
-        for name in self.names:
-            if name not in qpu.custom_states:
-                qpu.custom_states[name] = np.array([1, 0], dtype=complex)
-            if simulator is not None:
-                simulator.custom_tokens[name] = name
-            memory.setdefault(name, {})[0] = qpu.custom_states[name]
-            hilbert_output(simulator, name, qpu.custom_states[name])
-
-        return f"CREATETOKEN created: {', '.join(self.names)}", None
-
-    def __repr__(self):
-        return "CREATETOKEN -I " + " ".join(self.names)
-
-
-class DeleteTokenASTNode:
-    def __init__(self, tokens):
-        if tokens and tokens[0].upper() == "-I":
-            tokens = tokens[1:]
-        if not tokens:
-            raise ValueError("DELETETOKEN requires at least one token")
-        self.names = tokens[:]
-
-    def is_ready(self, *args):
-        return True
-
-    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
-        for name in self.names:
-            if simulator and name not in simulator.custom_tokens:
-                raise ValueError(f"Token '{name}' not found")
-            if name in qpu.custom_states:
-                del qpu.custom_states[name]
-            if simulator:
-                del simulator.custom_tokens[name]
-        return f"DELETETOKEN deleted: {', '.join(self.names)}", None
-
-    def __repr__(self):
-        return "DELETETOKEN -I " + " ".join(self.names)
 
 
 class FreeASTNode:
@@ -999,7 +931,7 @@ class OrASTNode:
         ctrl1,_ = self.inputs[0]
         ctrl2,_ = self.inputs[1]
         qpu.apply_single_qubit_gate(X, ctrl1)
-        qpu.apply_single_qubit_gatee(X, ctrl2)
+        qpu.apply_single_qubit_gate(X, ctrl2)
         qpu.apply_ccnot(ctrl1, ctrl2, self.target_qubit)
         qpu.apply_single_qubit_gate(X, ctrl1)
         qpu.apply_single_qubit_gate(X, ctrl2)
@@ -1295,10 +1227,8 @@ def parse_command(command_str: str):
     cmd = tokens[0].upper()
     upp = [t.upper() for t in tokens]
 
-    if cmd == "CYCLE":
-        return CycleASTNode(tokens)
     if cmd == "INCREASECYCLE":
-        return IncreaseCycleASTNode(tokens)
+        return CycleASTNode(tokens)
     if cmd == "COMPILEPROCESS":
         return CompileASTNode(tokens)
     if cmd == "FREE":
@@ -1320,10 +1250,6 @@ def parse_command(command_str: str):
         return DeclareChildASTNode(tokens[1:])
     if cmd == "RUNCHILD":
         return RunChildASTNode(tokens[1:])
-    if cmd == "CREATETOKEN":
-        return CreateTokenASTNode(tokens[1:])
-    if cmd == "DELETETOKEN":
-        return DeleteTokenASTNode(tokens[1:])
     if cmd == "AND":
         if "-I" not in upp or "-O" not in upp:
             raise ValueError("AND requires -I and -O")

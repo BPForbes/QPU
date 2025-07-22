@@ -11,8 +11,8 @@ CREATETOKEN -I C2 C4
 
 # — lower half (bits 0–1) —
 SET A0:0 $A0
-SET A1:0 $A1
 SET B0:0 $B0
+SET A1:0 $A1
 SET B1:0 $B1
 # feed in Cin as initial carry
 RUNCHILD TwoBitFullAdder -I $A0 $A1 $B0 $B1 $Cin -O Sum0 Sum1 C2:0
@@ -20,8 +20,8 @@ ACCEPTVALS Sum0 Sum1 C2
 
 # — upper half (bits 2–3) —
 SET A2:0 $A2
-SET A3:0 $A3
 SET B2:0 $B2
+SET A3:0 $A3
 SET B3:0 $B3
 # carry‑in is C2 now
 RUNCHILD TwoBitFullAdder -I $A2 $A3 $B2 $B3 C2 -O Sum2 Sum3 C4:0
