@@ -1020,6 +1020,8 @@ class SaveStateASTNode:
             "memory": deepcopy(memory),
             "clock_stack": deepcopy(simulator._clock_stack),
         }
+        if hasattr(simulator, "clear_locks"):
+            simulator.clear_locks()
         hilbert_output(simulator, "checkpoint", qpu.full_state_vector())
         return f"Saved state '{self.label}'", None
 
@@ -1043,6 +1045,8 @@ class LoadStateASTNode:
         qpu.set_states(cp["qpu_states"])
         simulator.memory = deepcopy(cp["memory"])
         simulator._clock_stack = deepcopy(cp["clock_stack"])
+        if hasattr(simulator, "clear_locks"):
+            simulator.clear_locks()
         return f"Loaded state '{self.label}'", None
 
     def __repr__(self):

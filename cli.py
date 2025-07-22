@@ -87,9 +87,8 @@ class CircuitSimulator:
 
         # history for runtime fingerprinting
         self.runtime_history = []
-
-        # track SET locks per qubit id
-        self._locked = {}
+        # per-process stack of SET locks
+        self._lock_stack = [set()]
 
         # child‑process support
         self.child_return_keys = []
@@ -147,16 +146,28 @@ class CircuitSimulator:
                 msgs.append(f"{k}@{c} freed")
         return ", ".join(msgs)
 
+    # ——— child‑process support —————————————————————————————————————
     def lock_id(self, key):
-        self._locked[key] = True
+        self._lock_stack[-1].add(key)
 
     def unlock_id(self, key):
-        if key in self._locked:
-            del self._locked[key]
+        self._lock_stack[-1].discard(key)
 
     def is_locked(self, key):
-        return self._locked.get(key, False)
+        return key in self._lock_stack[-1]
 
+    def start_process(self):
+        self._lock_stack.append(set())
+
+    def end_process(self):
+        if len(self._lock_stack) > 1:
+            self._lock_stack.pop()
+
+    def clear_locks(self):
+        self._lock_stack[-1].clear()
+
+    
+    
     def get_runtime_history_string(self):
         return "\n".join(self.runtime_history)
 
@@ -211,6 +222,7 @@ class CircuitSimulator:
         # run child lines in isolated local cycle space
         start_global = self.current_cycle
         self._clock_stack.append(ClockFrame(name, base=start_global, local=0))
+        self.start_process()
 
         for L in lines:
             t = L.strip()
@@ -246,6 +258,7 @@ class CircuitSimulator:
                 del self.custom_tokens[token]
 
         self._clock_stack.pop()
+        self.end_process()
 
         return ret_vals, updated_tokens
 
@@ -271,6 +284,7 @@ def run_single_process(cmd_line, sim: CircuitSimulator):
         assigns = assign_parameter_values(info["param_defs"], args)
         lines = substitute_parameters(lines, assigns)
     print(color_text(f"--- Process '{name}' START ---","magenta"))
+    sim.start_process()
 
     for L in lines:
         t = L.strip()
@@ -286,6 +300,7 @@ def run_single_process(cmd_line, sim: CircuitSimulator):
         except Exception as e:
             print(color_text(f"  ↳ ERROR: {e}","red"))
 
+    sim.end_process()
     print(color_text(f"--- Process '{name}' END ---","magenta"))
     print(color_text("Final Memory:","yellow"))
     print(generate_complete_memory_snapshot(sim))
