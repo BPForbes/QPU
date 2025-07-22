@@ -189,6 +189,38 @@ def generate_noise(params_str: str, noise_length=64) -> str:
     return "".join(rnd.choice("01") for _ in range(noise_length))
 
 
+SECTION_MAP = {
+    "GLOBALPROLOGUE:": "global_prologue",
+    "MAINPROLOGUE:": "main_prologue",
+    "CHILDPROLOGUE:": "child_prologue",
+    "CHILDRENWRAPUP:": "children_wrapup",
+    "MAINWRAPUP:": "main_wrapup",
+}
+
+
+def split_sections(lines):
+    """Partition protocol lines into logical sections."""
+    sections = {
+        "global_prologue": [],
+        "main_prologue": [],
+        "child_prologue": [],
+        "children_wrapup": [],
+        "main_wrapup": [],
+        "body": [],
+    }
+    current = "body"
+    for line in lines:
+        upper = line.strip().upper()
+        if upper in SECTION_MAP:
+            current = SECTION_MAP[upper]
+            continue
+        if upper == "ENDWRAPUP":
+            current = "body"
+            continue
+        sections[current].append(line)
+    return sections
+
+
 def interpret_token(token: str):
     """
     Recognizes:
@@ -397,6 +429,9 @@ class SetASTNode:
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
         if simulator is not None and not hasattr(simulator, "custom_tokens"):
             simulator.custom_tokens = {}
+        if simulator is not None and isinstance(self.key, int) and hasattr(simulator, "is_locked"):
+            if simulator.is_locked(self.key):
+                raise ValueError(f"ID {self.key} is locked until measured")
 
         m = re.match(r"^(0p|1p|sp)(?:_dim(\d+))?$", self.val.lower())
         if m:
@@ -439,6 +474,9 @@ class SetASTNode:
             qpu.custom_states[self.key] = state
             simulator.custom_tokens[self.key] = self.key
 
+        if simulator is not None and isinstance(self.key, int) and hasattr(simulator, "lock_id"):
+            simulator.lock_id(self.key)
+
         return f"SET {self.key}@{target_cycle} → {format_qubit_state(state)}", state
 
     def __repr__(self):
@@ -477,7 +515,17 @@ class CompileASTNode:
             assigns = assign_parameter_values(defs, self.params)
             lines = substitute_parameters(lines, assigns)
 
-        for L in lines:
+        sections = split_sections(lines)
+        all_lines = (
+            sections["global_prologue"]
+            + sections["main_prologue"]
+            + sections["child_prologue"]
+            + sections["body"]
+            + sections["children_wrapup"]
+            + sections["main_wrapup"]
+        )
+
+        for L in all_lines:
             up = L.strip().upper()
             if up.startswith(("CALL ", "RUNCHILD ", "DECLARECHILD ")):
                 dep = L.strip().split()[1]
@@ -487,11 +535,11 @@ class CompileASTNode:
                     ).evaluate(memory, current_cycle, qpu, hilbert, simulator)
 
         noise = generate_noise(" ".join(self.params))
-        content = ("\n".join(self.params + lines + [noise])).encode("utf-8")
+        content = ("\n".join(self.params + all_lines + [noise])).encode("utf-8")
         fp = binary_to_ascii(binary_fingerprint(content))
 
         errs = []
-        for idx, L in enumerate(lines, 1):
+        for idx, L in enumerate(all_lines, 1):
             t = L.strip()
             if not t or t.startswith(("#", "/*")) or t.upper().startswith("PARAMS:"):
                 continue
@@ -506,14 +554,15 @@ class CompileASTNode:
             )
 
         simulator.compiled_processes[self.proc] = {
-            "lines": lines,
+            "sections": sections,
             "fingerprint": fp,
             "param_defs": defs,
             "no_params": self.no_params,
         }
 
+        total = sum(len(v) for v in sections.values())
         return (
-            f"COMPILEPROCESS '{self.proc}' compiled ({len(lines)} lines) fingerprint={fp}",
+            f"COMPILEPROCESS '{self.proc}' compiled ({total} lines) fingerprint={fp}",
             None,
         )
 
@@ -582,16 +631,22 @@ class MeasureASTNode:
 
             bits, vec = qpu.measure_register(k)
             _commit(k, cy, vec)
+            if simulator is not None and isinstance(k, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(k)
             return f"MEASURE {k}@{cy} → {bits}", vec
 
         results = {}
         for q in range(qpu.num_qubits):
             bits, vec = qpu.measure_register(q)
             _commit(q, current_cycle, vec)
+            if simulator is not None and isinstance(q, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(q)
             results[f"q{q}"] = bits
         for tok in list(qpu.custom_states):
             bits, vec = qpu.measure_register(tok)
             _commit(tok, current_cycle, vec)
+            if simulator is not None and isinstance(tok, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(tok)
             results[str(tok)] = bits
 
         pretty = ", ".join(f"{k}:{v}" for k, v in results.items())
@@ -627,7 +682,20 @@ class CallASTNode:
             ).evaluate(memory, current_cycle, qpu, hilbert, simulator)
 
         info = simulator.compiled_processes[self.proc]
-        lines = list(info["lines"])
+        sections = info["sections"]
+        if simulator.subprocess_depth == 0:
+            lines = (
+                sections["global_prologue"]
+                + sections["main_prologue"]
+                + sections["body"]
+                + sections["main_wrapup"]
+            )
+        else:
+            lines = (
+                sections["child_prologue"]
+                + sections["body"]
+                + sections["children_wrapup"]
+            )
 
         if info["param_defs"] and self.params:
             assigns = assign_parameter_values(info["param_defs"], self.params)
@@ -991,6 +1059,24 @@ class AcceptValsASTNode:
         return "ACCEPTVALS " + " ".join(self.locals)
 
 
+class MasterValASTNode:
+    """Record the final return value name for the process"""
+
+    def __init__(self, token):
+        self.value = token
+
+    def is_ready(self, *args):
+        return True
+
+    def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
+        if simulator is not None:
+            simulator.master_value = self.value
+        return f"MASTERVAL {self.value}", None
+
+    def __repr__(self):
+        return f"MASTERVAL {self.value}"
+
+
 class SaveStateASTNode:
     def __init__(self, tokens):
         if len(tokens) != 2:
@@ -1008,6 +1094,8 @@ class SaveStateASTNode:
             "memory": deepcopy(memory),
             "clock_stack": deepcopy(simulator._clock_stack),
         }
+        if hasattr(simulator, "clear_locks"):
+            simulator.clear_locks()
         hilbert_output(simulator, "checkpoint", qpu.full_state_vector())
         return f"Saved state '{self.label}'", None
 
@@ -1031,6 +1119,8 @@ class LoadStateASTNode:
         qpu.set_states(cp["qpu_states"])
         simulator.memory = deepcopy(cp["memory"])
         simulator._clock_stack = deepcopy(cp["clock_stack"])
+        if hasattr(simulator, "clear_locks"):
+            simulator.clear_locks()
         return f"Loaded state '{self.label}'", None
 
     def __repr__(self):
@@ -1284,6 +1374,10 @@ def parse_command(command_str: str):
         return ReturnValsASTNode(tokens)
     if cmd == "ACCEPTVALS":
         return AcceptValsASTNode(tokens)
+    if cmd == "MASTERVAL":
+        if len(tokens) != 2:
+            raise ValueError("MASTERVAL requires one token")
+        return MasterValASTNode(tokens[1])
     if cmd == "SAVE_STATE":
         return SaveStateASTNode(tokens)
     if cmd == "LOAD_STATE":
