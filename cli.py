@@ -1,4 +1,4 @@
-﻿# cli.py
+# cli.py
 
 """
 Interactive CLI for the Universal Quantum Circuit Simulator,
@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from qpu.hilbert import HilbertSpace
 from qpu.qpu_base import QuantumProcessorUnit, format_qubit_state
 import numpy as np
+
 # ANSI colors
 COLORS = {
     "reset": "\033[0m",
@@ -87,12 +88,11 @@ class CircuitSimulator:
 
         # history for runtime fingerprinting
         self.runtime_history = []
+        # per-process stack of SET locks
+        self._lock_stack = [set()]
 
         # value set by MASTERVAL
         self.master_value = None
-
-        # per-process stack of SET locks
-        self._lock_stack = [set()]
 
         # child‑process support
         self.child_return_keys = []
@@ -116,7 +116,7 @@ class CircuitSimulator:
 
     def prune_cycles(self):
         for k in list(self.memory):
-            self.memory[k] = {c:v for c,v in self.memory[k].items()
+            self.memory[k] = {c: v for c, v in self.memory[k].items()
                               if c <= self.max_cycles}
             if not self.memory[k]:
                 del self.memory[k]
@@ -124,32 +124,35 @@ class CircuitSimulator:
 
     def run_cycle(self, suppress_output=False):
         if not suppress_output:
-            print(color_text(f"\n--- Cycle {self.current_cycle} ---","cyan"))
+            print(color_text(f"\n--- Cycle {self.current_cycle} ---", "cyan"))
             print(color_text("Memory:", "magenta"))
             print(generate_complete_memory_snapshot(self))
         for node in list(self.ast_nodes):
             if node.is_ready(self.memory, self.current_cycle, self.qpu):
                 try:
-                    msg,_ = node.evaluate(self.memory,
-                                          self.current_cycle,
-                                          self.qpu,
-                                          self.hilbert,
-                                          self)
+                    msg, _ = node.evaluate(
+                        self.memory,
+                        self.current_cycle,
+                        self.qpu,
+                        self.hilbert,
+                        self
+                    )
                     if not suppress_output:
-                        print(color_text(f"✔ {node}: {msg}","green"))
+                        print(color_text(f"✔ {node}: {msg}", "green"))
                 except Exception as e:
                     if not suppress_output:
-                        print(color_text(f"✗ {node}: {e}","red"))
+                        print(color_text(f"✗ {node}: {e}", "red"))
         self.increase_cycle()
 
     def free_memory_entries(self, entries):
         msgs = []
-        for k,c in entries:
+        for k, c in entries:
             if k in self.memory and c in self.memory[k]:
                 del self.memory[k][c]
                 msgs.append(f"{k}@{c} freed")
         return ", ".join(msgs)
 
+    # ——— child‑process support —————————————————————————————————————
     def lock_id(self, key):
         self._lock_stack[-1].add(key)
 
@@ -164,7 +167,19 @@ class CircuitSimulator:
 
     def end_process(self):
         if len(self._lock_stack) > 1:
-            self._lock_stack.pop()
+            to_unlock = self._lock_stack.pop()
+
+            # reset each unlocked ID to |0> at the current cycle
+            for qid in to_unlock:
+                zero_state = np.array([1.0, 0.0], dtype=complex)
+                # update QPU internal state
+                self.qpu.custom_states[qid] = zero_state
+                # record in memory and Hilbert output
+                cyc = self.current_cycle
+                self.memory.setdefault(qid, {})[cyc] = zero_state
+                self.hilbert.output(qid, cyc, zero_state)
+                # remove from custom_tokens so it can be reallocated
+                self.custom_tokens.pop(qid, None)
 
     def clear_locks(self):
         self._lock_stack[-1].clear()
@@ -174,29 +189,20 @@ class CircuitSimulator:
 
     def get_runtime_fingerprint(self):
         hist = self.get_runtime_history_string().encode()
-        bp = ''.join(format(b,'08b') for b in hist)
+        bp = ''.join(format(b, '08b') for b in hist)
         return binary_to_ascii(bp), self.get_runtime_history_string()
 
     def process_summary(self):
         rep = "\n".join(self.runtime_history)
         rep += "\nFinal Memory:\n" + generate_complete_memory_snapshot(self)
-        bp = ''.join(format(ord(c),'08b') for c in rep)
+        bp = ''.join(format(ord(c), '08b') for c in rep)
         return rep, binary_to_ascii(bp)
 
-    # ——— child‑process support —————————————————————————————————————
     def declare_child(self, child_name):
-        # you can add checks here if desired
         if child_name not in self.compiled_processes:
             raise ValueError(f"Child '{child_name}' not compiled")
 
     def run_child(self, name, args, parent_tokens):
-        """
-        Execute the compiled process 'name' in child mode, passing 'args' as parameters.
-        After hitting RETURNVALS, collects those keys from memory and returns their states.
-        Each line in the child will increment a local cycle to avoid timing issues.
-        Also returns the updated states of any parent tokens injected into the child,
-        formatted using format_qubit_state, and logs only those that were actually modified.
-        """
         if name not in self.compiled_processes:
             raise ValueError(f"Child '{name}' not compiled")
 
@@ -208,12 +214,10 @@ class CircuitSimulator:
             + sections["children_wrapup"]
         )
 
-        # parameter substitution if the child had PARAMS:
         if info.get("param_defs") and args:
             assigns = assign_parameter_values(info["param_defs"], args)
             lines = substitute_parameters(lines, assigns)
 
-        # Inject parent tokens into QPU and simulator if needed
         injected_tokens = []
         original_states = {}
         for token in parent_tokens.values():
@@ -225,7 +229,6 @@ class CircuitSimulator:
             if token not in self.custom_tokens:
                 self.custom_tokens[token] = token
 
-        # run child lines in isolated local cycle space
         start_global = self.current_cycle
         self._clock_stack.append(ClockFrame(name, base=start_global, local=0))
         self.start_process()
@@ -238,7 +241,6 @@ class CircuitSimulator:
             node.evaluate(self.memory, self.current_cycle, self.qpu, self.hilbert, self)
             self.increase_cycle()
 
-        # gather return values from final local cycle
         ret_vals = []
         from qpu.ast import interpret_token
         final_cycle = self.current_cycle - 1
@@ -247,7 +249,6 @@ class CircuitSimulator:
             val = readdress_value(self.memory, k, final_cycle, self.qpu)
             ret_vals.append(val)
 
-        # Collect updated states of injected parent tokens, only if changed
         updated_tokens = {}
         for token in parent_tokens.values():
             if token in self.qpu.custom_states:
@@ -256,7 +257,6 @@ class CircuitSimulator:
                 if old_state is None or not np.array_equal(new_state, old_state):
                     updated_tokens[token] = format_qubit_state(new_state)
 
-        # Clean up injected parent tokens after subprocess finishes
         for token in injected_tokens:
             if token in self.qpu.custom_states:
                 del self.qpu.custom_states[token]
@@ -268,19 +268,18 @@ class CircuitSimulator:
 
         return ret_vals, updated_tokens
 
-
 # ——— single‑process runner —————————————————————————————————————————
 def run_single_process(cmd_line, sim: CircuitSimulator):
     parts = cmd_line.strip().split()
     U = [p.upper() for p in parts]
     if "--NAME" not in U:
-        print(color_text("RUNPROCESS needs --NAME","red"))
+        print(color_text("RUNPROCESS needs --NAME", "red"))
         return
     idx = U.index("--NAME")
     name = parts[idx + 1]
-    args = parts[idx + 2 :]
+    args = parts[idx + 2:]
     if name not in sim.compiled_processes:
-        print(color_text(f"Process '{name}' not compiled","red"))
+        print(color_text(f"Process '{name}' not compiled", "red"))
         return
 
     info = sim.compiled_processes[name]
@@ -295,26 +294,26 @@ def run_single_process(cmd_line, sim: CircuitSimulator):
     if info.get("param_defs"):
         assigns = assign_parameter_values(info["param_defs"], args)
         lines = substitute_parameters(lines, assigns)
-    print(color_text(f"--- Process '{name}' START ---","magenta"))
+
+    print(color_text(f"--- Process '{name}' START ---", "magenta"))
     sim.start_process()
 
     for L in lines:
         t = L.strip()
-        if not t or t.upper().startswith(("PARAMS:","#","/*")):
+        if not t or t.upper().startswith(("PARAMS:", "#", "/*")):
             continue
 
-        print(color_text(f"[Process] {t}","blue"))
+        print(color_text(f"[Process] {t}", "blue"))
         node = parse_command(t)
         try:
-            node.evaluate(sim.memory, sim.current_cycle,
-                          sim.qpu, sim.hilbert, sim)
-            print(color_text("  ↳ OK","green"))
+            node.evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+            print(color_text("  ↳ OK", "green"))
         except Exception as e:
-            print(color_text(f"  ↳ ERROR: {e}","red"))
+            print(color_text(f"  ↳ ERROR: {e}", "red"))
 
     sim.end_process()
-    print(color_text(f"--- Process '{name}' END ---","magenta"))
-    print(color_text("Final Memory:","yellow"))
+    print(color_text(f"--- Process '{name}' END ---", "magenta"))
+    print(color_text("Final Memory:", "yellow"))
     print(generate_complete_memory_snapshot(sim))
 
 # ——— interactive loop —————————————————————————————————————————————
@@ -322,13 +321,13 @@ def interactive_cli():
     qpu = QuantumProcessorUnit(16)
     sim = CircuitSimulator(qpu)
 
-    print(color_text("Welcome to the Universal Quantum CLI!","green"))
+    print(color_text("Welcome to the Universal Quantum CLI!", "green"))
     print_help()
 
     while True:
         try:
-            inp = input(color_text(">> ","yellow")).strip()
-        except (EOFError,KeyboardInterrupt):
+            inp = input(color_text(">> ", "yellow")).strip()
+        except (EOFError, KeyboardInterrupt):
             print()
             break
         if not inp:
@@ -344,14 +343,10 @@ def interactive_cli():
         if cmd == "COMPILEPROCESS":
             try:
                 node = parse_command(inp)
-                msg,_ = node.evaluate(sim.memory,
-                                      sim.current_cycle,
-                                      sim.qpu,
-                                      sim.hilbert,
-                                      sim)
-                print(color_text(msg,"green"))
+                msg, _ = node.evaluate(sim.memory, sim.current_cycle, sim.qpu, sim.hilbert, sim)
+                print(color_text(msg, "green"))
             except Exception as e:
-                print(color_text(f"Error: {e}","red"))
+                print(color_text(f"Error: {e}", "red"))
             continue
 
         if cmd == "RUNPROCESS":
@@ -362,9 +357,9 @@ def interactive_cli():
         try:
             node = parse_command(inp)
             sim.ast_nodes.append(node)
-            print(color_text(f"Queued: {node}","cyan"))
+            print(color_text(f"Queued: {node}", "cyan"))
         except Exception as e:
-            print(color_text(f"Parse error: {e}","red"))
+            print(color_text(f"Parse error: {e}", "red"))
 
-if __name__=="__main__":
+if __name__ == "__main__":
     interactive_cli()
