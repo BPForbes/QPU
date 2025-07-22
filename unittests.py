@@ -52,12 +52,12 @@ def _make_single_bit_test(A, B, Cin, exp_sum, exp_cout):
             TestSingleBitAdder.proc_name,
             [A, B, Cin],
         )
-        s_cycle = max(sim.memory[3].keys())
-        c_cycle = max(sim.memory[4].keys())
-        s = sim.memory[3][s_cycle]
-        c = sim.memory[4][c_cycle]
-        np.testing.assert_allclose(s, exp_sum, atol=1e-7)
-        np.testing.assert_allclose(c, exp_cout, atol=1e-7)
+        res_cycle = max(sim.memory["Result"].keys())
+        vec = sim.memory["Result"][res_cycle]
+        idx = int(np.argmax(np.abs(vec)**2))
+        expected_idx = (int(exp_sum[1]) << 1) | int(exp_cout[1])
+        self.assertEqual(idx, expected_idx,
+            f"Got index {idx}, expected {(exp_sum,exp_cout)} -> {expected_idx}")
     return test
 
 for idx, combo in enumerate(_single_bit_combos):
@@ -83,11 +83,7 @@ class TestTwoBitAdder(unittest.TestCase):
         s0   = (total >> 0) & 1
         s1   = (total >> 1) & 1
         cout = (total >> 2) & 1
-        return (
-            TestTwoBitAdder.one  if s0 else TestTwoBitAdder.zero,
-            TestTwoBitAdder.one  if s1 else TestTwoBitAdder.zero,
-            TestTwoBitAdder.one  if cout else TestTwoBitAdder.zero,
-        )
+        return s0, s1, cout
 
 _bits = ["0p", "1p"]
 _two_bit_combos = [
@@ -102,15 +98,14 @@ def _make_two_bit_test(A0, A1, B0, B1, Cin, exp_s0, exp_s1, exp_cout):
             TestTwoBitAdder.proc_name,
             [A0, A1, B0, B1, Cin],
         )
-        s0_cycle = max(sim.memory["Sum0"].keys())
-        s1_cycle = max(sim.memory["Sum1"].keys())
-        cout_cycle = max(sim.memory["Cout"].keys())
-        s0 = sim.memory["Sum0"][s0_cycle]
-        s1 = sim.memory["Sum1"][s1_cycle]
-        cout = sim.memory["Cout"][cout_cycle]
-        np.testing.assert_allclose(s0, exp_s0, atol=1e-7)
-        np.testing.assert_allclose(s1, exp_s1, atol=1e-7)
-        np.testing.assert_allclose(cout, exp_cout, atol=1e-7)
+        res_cycle = max(sim.memory["Result"].keys())
+        vec = sim.memory["Result"][res_cycle]
+        idx = int(np.argmax(np.abs(vec)**2))
+        expected_idx = (exp_s0 << 2) | (exp_s1 << 1) | exp_cout
+        self.assertEqual(
+            idx, expected_idx,
+            f"Expected bits {(exp_s0,exp_s1,exp_cout)} -> idx {expected_idx}, got {idx}"
+        )
     return test
 
 for idx, combo in enumerate(_two_bit_combos):
@@ -139,13 +134,7 @@ class TestFourBitAdder(unittest.TestCase):
         s2   = (total >> 2) & 1
         s3   = (total >> 3) & 1
         cout = (total >> 4) & 1
-        return (
-            TestFourBitAdder.one  if s0 else TestFourBitAdder.zero,
-            TestFourBitAdder.one  if s1 else TestFourBitAdder.zero,
-            TestFourBitAdder.one  if s2 else TestFourBitAdder.zero,
-            TestFourBitAdder.one  if s3 else TestFourBitAdder.zero,
-            TestFourBitAdder.one  if cout else TestFourBitAdder.zero,
-        )
+        return s0, s1, s2, s3, cout
 
 _four_bit_combos = [
     (A0, A1, A2, A3, B0, B1, B2, B3, Cin, *TestFourBitAdder.expected(A0, A1, A2, A3, B0, B1, B2, B3, Cin))
@@ -159,21 +148,20 @@ def _make_four_bit_test(A0, A1, A2, A3, B0, B1, B2, B3, Cin, exp_s0, exp_s1, exp
             TestFourBitAdder.proc_name,
             [A0, A1, A2, A3, B0, B1, B2, B3, Cin],
         )
-        s0_cycle = max(sim.memory["Sum0"].keys())
-        s1_cycle = max(sim.memory["Sum1"].keys())
-        s2_cycle = max(sim.memory["Sum2"].keys())
-        s3_cycle = max(sim.memory["Sum3"].keys())
-        cout_cycle = max(sim.memory["C4"].keys())
-        s0 = sim.memory["Sum0"][s0_cycle]
-        s1 = sim.memory["Sum1"][s1_cycle]
-        s2 = sim.memory["Sum2"][s2_cycle]
-        s3 = sim.memory["Sum3"][s3_cycle]
-        cout = sim.memory["C4"][cout_cycle]
-        np.testing.assert_allclose(s0, exp_s0, atol=1e-7)
-        np.testing.assert_allclose(s1, exp_s1, atol=1e-7)
-        np.testing.assert_allclose(s2, exp_s2, atol=1e-7)
-        np.testing.assert_allclose(s3, exp_s3, atol=1e-7)
-        np.testing.assert_allclose(cout, exp_cout, atol=1e-7)
+        res_cycle = max(sim.memory["Result"].keys())
+        vec = sim.memory["Result"][res_cycle]
+        idx = int(np.argmax(np.abs(vec)**2))
+        expected_idx = (
+            (exp_s0 << 4)
+            | (exp_s1 << 3)
+            | (exp_s2 << 2)
+            | (exp_s3 << 1)
+            | exp_cout
+        )
+        self.assertEqual(
+            idx, expected_idx,
+            f"Expected {(exp_s0,exp_s1,exp_s2,exp_s3,exp_cout)} -> idx {expected_idx}, got {idx}"
+        )
     return test
 
 for idx, combo in enumerate(_four_bit_combos):

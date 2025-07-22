@@ -22,4 +22,11 @@ CCNOT -I 1:0 2:0 -O 4:0
 MEASURE -I 3
 MEASURE -I 4
 
-RETURNVALS 3 4
+# update the provided carry token with Cout
+SET $Cin 4:0
+
+# join the two classical bits into one 2-qubit register
+JOIN   -I 3:0 4:0 -O Result:0
+
+# return only that single 2-qubit register
+RETURNVALS Result

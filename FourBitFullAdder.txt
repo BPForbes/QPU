@@ -1,39 +1,87 @@
-﻿# FourBitFullAdder.txt
+# FourBitFullAdder.txt
 PARAMS: A0:state A1:state A2:state A3:state \
         B0:state B1:state B2:state B3:state \
-        Cin:state Sum0:int Sum1:int Sum2:int Sum3:int C4:int
+        Cin:state
 
 MAIN-PROCESS FourBitFullAdder
-DECLARECHILD TwoBitFullAdder
+CREATETOKEN -I C1 C2 C3 C4 Sum0 Sum1 Sum2 Sum3 Result
+SET C1:0 $Cin
 
-# initialize carry‐tokens at cycle 0
-CREATETOKEN -I C2 C4
-SET C2:0 0p
-SET C4:0 0p
+# --- bit 0 ---
+SET 0:0 $A0
+SET 1:0 $B0
+SET 2:0 C1:0
+SET 3:0 0p
+SET 4:0 0p
+CNOT -I 0:0 -O 3:0
+CNOT -I 1:0 -O 3:0
+CNOT -I 2:0 -O 3:0
+CCNOT -I 0:0 1:0 -O 4:0
+CCNOT -I 0:0 2:0 -O 4:0
+CCNOT -I 1:0 2:0 -O 4:0
+MEASURE -I 3:0
+MEASURE -I 4:0
+SET Sum0:0 3:0
+SET C1:0 4:0
+INCREASECYCLE
+INCREASECYCLE
 
-# bits 0–1 at cycle 0
-SET A0:0 $A0
-SET A1:0 $A1
-SET B0:0 $B0
-SET B1:0 $B1
-SET Cin:0 $Cin
-RUNCHILD TwoBitFullAdder \
-  -I $A0 $A1 $B0 $B1 $Cin \
-  -O Sum0 Sum1 C2:0
-ACCEPTVALS Sum0 Sum1 C2
+# --- bit 1 ---
+SET 0:2 $A1
+SET 1:2 $B1
+SET 2:2 C1:0
+SET 3:2 0p
+SET 4:2 0p
+CNOT -I 0:2 -O 3:2
+CNOT -I 1:2 -O 3:2
+CNOT -I 2:2 -O 3:2
+CCNOT -I 0:2 1:2 -O 4:2
+CCNOT -I 0:2 2:2 -O 4:2
+CCNOT -I 1:2 2:2 -O 4:2
+MEASURE -I 3:2
+MEASURE -I 4:2
+SET Sum1:2 3:2
+SET C2:2 4:2
+INCREASECYCLE
+INCREASECYCLE
 
-# advance two cycles → now cycle 2
+# --- bit 2 ---
+SET 0:4 $A2
+SET 1:4 $B2
+SET 2:4 C2:2
+SET 3:4 0p
+SET 4:4 0p
+CNOT -I 0:4 -O 3:4
+CNOT -I 1:4 -O 3:4
+CNOT -I 2:4 -O 3:4
+CCNOT -I 0:4 1:4 -O 4:4
+CCNOT -I 0:4 2:4 -O 4:4
+CCNOT -I 1:4 2:4 -O 4:4
+MEASURE -I 3:4
+MEASURE -I 4:4
+SET Sum2:4 3:4
+SET C3:4 4:4
+INCREASECYCLE
+INCREASECYCLE
 
-# bits 2–3 at cycle 2
-SET A2:0 $A2
-SET A3:0 $A3
-SET B2:0 $B2
-SET B3:0 $B3
-RUNCHILD TwoBitFullAdder \
-  -I $A2 $A3 $B2 $B3 C2:2 \
-  -O Sum2 Sum3 C4:2
-ACCEPTVALS Sum2 Sum3 C4
+# --- bit 3 ---
+SET 0:6 $A3
+SET 1:6 $B3
+SET 2:6 C3:4
+SET 3:6 0p
+SET 4:6 0p
+CNOT -I 0:6 -O 3:6
+CNOT -I 1:6 -O 3:6
+CNOT -I 2:6 -O 3:6
+CCNOT -I 0:6 1:6 -O 4:6
+CCNOT -I 0:6 2:6 -O 4:6
+CCNOT -I 1:6 2:6 -O 4:6
+MEASURE -I 3:6
+MEASURE -I 4:6
+SET Sum3:6 3:6
+SET C4:6 4:6
+INCREASECYCLE
+INCREASECYCLE
 
-# cleanup and return all four sums + final carry
-DELETETOKEN -I C2 C4
-RETURNVALS Sum0 Sum1 Sum2 Sum3 C4
+JOIN -I Sum0:0 Sum1:2 Sum2:4 Sum3:6 C4:6 -O Result:8
+RETURNVALS Result
