@@ -3,6 +3,7 @@
 import numpy as np
 import math
 import secrets
+from qpu.statevector import StateVector
 
 # Standard 2×2 Pauli / Hadamard matrices
 I = np.array([[1, 0], [0, 1]], dtype=complex)
@@ -69,12 +70,17 @@ class QuantumProcessorUnit:
     primitives mapped to CCNOT and CNOT.
     """
 
-    def __init__(self, num_qubits: int):
+    def __init__(self, num_qubits: int, *, noise=False,
+                 depolarizing_prob=0.0, readout_error=0.0):
         self.num_qubits = num_qubits
 
-        # Global state vector |0...0⟩
-        self.state = np.zeros(2**num_qubits, dtype=complex)
-        self.state[0] = 1.0
+        # Global state using the hybrid StateVector backend
+        self.statevec = StateVector(num_qubits)
+        self.noise = noise
+        self.depolarizing_prob = depolarizing_prob
+        self.readout_error = readout_error
+
+        # backward compatibility property ``state`` defined below
 
         # Individual physical qubit registers
         self.local_states = [np.array([1, 0], dtype=complex)
@@ -99,6 +105,11 @@ class QuantumProcessorUnit:
         self.property_table[:, 0] = np.random.uniform(4.9, 5.1, num_qubits)
         self.property_table[:, 1] = np.abs(np.random.normal(100, 10, num_qubits))
         self.property_table[:, 2] = np.abs(np.random.normal( 80, 10, num_qubits))
+
+    @property
+    def state(self):
+        """Return the current full state vector."""
+        return self.statevec.full_state()
 
     def _validate_qubit(self, *idxs):
         """
@@ -164,21 +175,22 @@ class QuantumProcessorUnit:
     # ------------------------------------------------------------------
 
     def rebuild_global_state(self):
-        """Rebuild ``self.state`` from the per-qubit ``local_states``."""
+        """Rebuild the global state from ``local_states``."""
         if not self.local_states:
-            self.state = np.array([1], dtype=complex)
-            return
-        state = self.local_states[-1]
-        for reg in reversed(self.local_states[:-1]):
-            state = np.kron(state, reg)
-        self.state = state
+            data = np.array([1], dtype=complex)
+        else:
+            data = self.local_states[-1]
+            for reg in reversed(self.local_states[:-1]):
+                data = np.kron(data, reg)
+        self.statevec.to_dense().data = data
 
     def _refresh_physical_qubit(self, idx):
         """Extract the single-qubit state for ``idx`` from ``self.state``."""
         mask = 1 << idx
         a = 0j
         b = 0j
-        for i, amp in enumerate(self.state):
+        data = self.statevec.to_dense().data
+        for i, amp in enumerate(data):
             if (i & mask) == 0:
                 a += amp
             else:
@@ -201,16 +213,8 @@ class QuantumProcessorUnit:
 
         # Update global if physical qubit
         if isinstance(target, int):
-            mask = 1 << target
-            N = self.state.size
-            for i in range(N):
-                if (i & mask) == 0:
-                    j = i | mask
-                    a, b = self.state[i], self.state[j]
-                    self.state[i] = gate[0,0]*a + gate[0,1]*b
-                    self.state[j] = gate[1,0]*a + gate[1,1]*b
-            # refresh local state from the updated global state
-            new_reg = self._refresh_physical_qubit(target)
+            self.statevec.apply_single_qubit_gate(gate, target)
+            new_reg = self.statevec.extract_qubit(target)
         else:
             new_reg = gate @ reg
 
@@ -328,6 +332,50 @@ class QuantumProcessorUnit:
         return self.apply_single_qubit_gate(P, target, cycle=cycle, hilbert=hilbert)
 
     # ----------------------------------------------------------------
+    # Noise channels
+    # ----------------------------------------------------------------
+
+    def _amplitude_damp(self, state, p):
+        K0 = np.array([[1, 0], [0, np.sqrt(1 - p)]], dtype=complex)
+        K1 = np.array([[0, np.sqrt(p)], [0, 0]], dtype=complex)
+        probs = [np.linalg.norm(K0 @ state) ** 2, np.linalg.norm(K1 @ state) ** 2]
+        r = secrets.SystemRandom().random()
+        if r < probs[0]:
+            new = K0 @ state
+        else:
+            new = K1 @ state
+        n = np.linalg.norm(new)
+        return new / n if n > 0 else new
+
+    def _phase_damp(self, state, p):
+        if p <= 0:
+            return state
+        K0 = np.sqrt(1 - p) * np.eye(2)
+        K1 = np.sqrt(p) * np.array([[1, 0], [0, -1]], dtype=complex)
+        probs = [np.linalg.norm(K0 @ state) ** 2, np.linalg.norm(K1 @ state) ** 2]
+        r = secrets.SystemRandom().random()
+        new = (K0 @ state) if r < probs[0] else (K1 @ state)
+        n = np.linalg.norm(new)
+        return new / n if n > 0 else new
+
+    def apply_idle_noise(self, dt=1.0):
+        if not self.noise:
+            return
+        for q in range(self.num_qubits):
+            T1 = self.property_table[q, 1]
+            T2 = self.property_table[q, 2]
+            p1 = 1 - np.exp(-dt / T1)
+            p2 = 1 - np.exp(-dt / T2)
+            state = self.statevec.extract_qubit(q)
+            state = self._amplitude_damp(state, p1)
+            state = self._phase_damp(state, p2)
+            if self.depolarizing_prob > 0 and secrets.SystemRandom().random() < self.depolarizing_prob:
+                pauli = [X, Y, Z][secrets.randbelow(3)]
+                state = pauli @ state
+            self.local_states[q] = state
+        self.rebuild_global_state()
+
+    # ----------------------------------------------------------------
     # Measurement
     # ----------------------------------------------------------------
 
@@ -337,6 +385,14 @@ class QuantumProcessorUnit:
         Returns ('0'|'1', new_state).
         """
         reg = self._get_register(target, target_dim=2)
+        if isinstance(target, int):
+            bit = self.statevec.measure_qubit(target)
+            new = np.array([1,0],dtype=complex) if bit=="0" else np.array([0,1],dtype=complex)
+            if self.readout_error > 0 and secrets.SystemRandom().random() < self.readout_error:
+                bit = "1" if bit == "0" else "0"
+                new = np.array([1,0],dtype=complex) if bit=="0" else np.array([0,1],dtype=complex)
+            self._update_register(target, new)
+            return bit, new
         p0 = abs(reg[0])**2
         if secrets.SystemRandom().random() < p0:
             new = np.array([1,0], dtype=complex)
@@ -380,7 +436,7 @@ class QuantumProcessorUnit:
         self.rebuild_global_state()
 
     def full_state_vector(self):
-        return self.state.copy()
+        return self.statevec.full_state()
 
     # ----------------------------------------------------------------
     # Device‐fingerprint methods
