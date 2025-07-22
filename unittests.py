@@ -136,10 +136,12 @@ class TestFourBitAdder(unittest.TestCase):
 
     @staticmethod
     def expected(A0, A1, A2, A3, B0, B1, B2, B3, Cin):
+        # build 4‑bit integers from the two pairs
         a = (int(A3[0]) << 3) | (int(A2[0]) << 2) | (int(A1[0]) << 1) | int(A0[0])
         b = (int(B3[0]) << 3) | (int(B2[0]) << 2) | (int(B1[0]) << 1) | int(B0[0])
         cin = int(Cin[0])
         total = a + b + cin
+        # extract each sum bit and final carry
         s0   = (total >> 0) & 1
         s1   = (total >> 1) & 1
         s2   = (total >> 2) & 1
@@ -153,30 +155,29 @@ class TestFourBitAdder(unittest.TestCase):
             TestFourBitAdder.one  if cout else TestFourBitAdder.zero,
         )
 
+_bits = ["0p", "1p"]
 _four_bit_combos = [
-    (A0, A1, A2, A3, B0, B1, B2, B3, Cin, *TestFourBitAdder.expected(
-        A0, A1, A2, A3, B0, B1, B2, B3, Cin
-    ))
+    (A0, A1, A2, A3, B0, B1, B2, B3, Cin,
+     *TestFourBitAdder.expected(A0, A1, A2, A3, B0, B1, B2, B3, Cin))
     for A0, A1, A2, A3, B0, B1, B2, B3, Cin in product(_bits, repeat=9)
 ]
 
-def _make_four_bit_test(A0, A1, A2, A3, B0, B1, B2, B3, Cin, exp_s0, exp_s1, exp_s2, exp_s3, exp_cout):
+def _make_four_bit_test(A0, A1, A2, A3, B0, B1, B2, B3, Cin,
+                        exp_s0, exp_s1, exp_s2, exp_s3, exp_cout):
     def test(self):
         sim = run_process(
             TestFourBitAdder.proc_file,
             TestFourBitAdder.proc_name,
             [A0, A1, A2, A3, B0, B1, B2, B3, Cin],
         )
-        s0_cycle = max(sim.memory["Sum0"].keys())
-        s1_cycle = max(sim.memory["Sum1"].keys())
-        s2_cycle = max(sim.memory["Sum2"].keys())
-        s3_cycle = max(sim.memory["Sum3"].keys())
-        cout_cycle = max(sim.memory["C4"].keys())
-        s0 = sim.memory["Sum0"][s0_cycle]
-        s1 = sim.memory["Sum1"][s1_cycle]
-        s2 = sim.memory["Sum2"][s2_cycle]
-        s3 = sim.memory["Sum3"][s3_cycle]
-        cout = sim.memory["C4"][cout_cycle]
+        # Sum0 & Sum1 from the first TwoBitFullAdder (cycle 0)
+        s0 = sim.memory["Sum0"][0]
+        s1 = sim.memory["Sum1"][0]
+        # Sum2 & Sum3 + final carry C4 from the second TwoBitFullAdder (cycle 1)
+        s2 = sim.memory["Sum2"][1]
+        s3 = sim.memory["Sum3"][1]
+        cout = sim.memory["C4"][1]
+
         np.testing.assert_allclose(s0, exp_s0, atol=1e-7)
         np.testing.assert_allclose(s1, exp_s1, atol=1e-7)
         np.testing.assert_allclose(s2, exp_s2, atol=1e-7)
@@ -184,9 +185,13 @@ def _make_four_bit_test(A0, A1, A2, A3, B0, B1, B2, B3, Cin, exp_s0, exp_s1, exp
         np.testing.assert_allclose(cout, exp_cout, atol=1e-7)
     return test
 
+# bind each combination as its own test method
 for idx, combo in enumerate(_four_bit_combos):
-    name = f"test_four_bit_{idx}_" + "".join(combo[:9])
+    # name includes the 9 inputs concatenated
+    key = "".join(combo[:9]).replace("p", "")
+    name = f"test_four_bit_{idx}_{key}"
     setattr(TestFourBitAdder, name, _make_four_bit_test(*combo))
+
 
 # -------------------------------------------------------------------
 # Direct gate interaction with Hilbert space

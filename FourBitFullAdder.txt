@@ -1,46 +1,35 @@
 # FourBitFullAdder.txt
 PARAMS: A0:state A1:state A2:state A3:state \
         B0:state B1:state B2:state B3:state \
-        Cin:state Sum0:int Sum1:int Sum2:int Sum3:int C4:int
+        Cin:state Sum0:int Sum1:int Sum2:int Sum3:int Cout:int
 
 MAIN-PROCESS FourBitFullAdder
-DECLARECHILD SingleBitFullAdder
+DECLARECHILD TwoBitFullAdder
+CREATETOKEN -I C2 C4
 
-# initialize carry tokens
-CREATETOKEN -I C1 C2 C3 C4
-SET C1:0 $Cin
-
-# bit 0
+# lower two bits (0–1) at cycle 0
 SET A0:0 $A0
+SET A1:0 $A1
 SET B0:0 $B0
-RUNCHILD SingleBitFullAdder -I $A0 $B0 C1 -O Sum0 C1:0
-INCREASECYCLE
-INCREASECYCLE
-ACCEPTVALS Sum0 C1
+SET B1:0 $B1
+SET Cin:0 $Cin
+RUNCHILD TwoBitFullAdder \
+  -I $A0 $A1 $B0 $B1 $Cin \
+  -O Sum0 Sum1 C2:0
+ACCEPTVALS Sum0 Sum1 C2
 
-# bit 1
-SET A1:2 $A1
-SET B1:2 $B1
-RUNCHILD SingleBitFullAdder -I $A1 $B1 C1:2 -O Sum1 C2:2
+# advance to cycle 1
 INCREASECYCLE
-INCREASECYCLE
-ACCEPTVALS Sum1 C2
 
-# bit 2
-SET A2:4 $A2
-SET B2:4 $B2
-RUNCHILD SingleBitFullAdder -I $A2 $B2 C2:4 -O Sum2 C3:4
-INCREASECYCLE
-INCREASECYCLE
-ACCEPTVALS Sum2 C3
+# upper two bits (2–3) at cycle 1
+SET A2:1 $A2
+SET A3:1 $A3
+SET B2:1 $B2
+SET B3:1 $B3
+RUNCHILD TwoBitFullAdder \
+  -I $A2 $A3 $B2 $B3 C2 \
+  -O Sum2 Sum3 C4:1
+ACCEPTVALS Sum2 Sum3 C4
 
-# bit 3
-SET A3:6 $A3
-SET B3:6 $B3
-RUNCHILD SingleBitFullAdder -I $A3 $B3 C3:6 -O Sum3 C4:6
-INCREASECYCLE
-INCREASECYCLE
-ACCEPTVALS Sum3 C4
-
-DELETETOKEN -I C1 C2 C3 C4
+DELETETOKEN -I C2 C4
 RETURNVALS Sum0 Sum1 Sum2 Sum3 C4
