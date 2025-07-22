@@ -397,6 +397,9 @@ class SetASTNode:
     def evaluate(self, memory, current_cycle, qpu, hilbert, simulator=None):
         if simulator is not None and not hasattr(simulator, "custom_tokens"):
             simulator.custom_tokens = {}
+        if simulator is not None and isinstance(self.key, int) and hasattr(simulator, "is_locked"):
+            if simulator.is_locked(self.key):
+                raise ValueError(f"ID {self.key} is locked until measured")
 
         m = re.match(r"^(0p|1p|sp)(?:_dim(\d+))?$", self.val.lower())
         if m:
@@ -438,6 +441,9 @@ class SetASTNode:
         else:
             qpu.custom_states[self.key] = state
             simulator.custom_tokens[self.key] = self.key
+
+        if simulator is not None and isinstance(self.key, int) and hasattr(simulator, "lock_id"):
+            simulator.lock_id(self.key)
 
         return f"SET {self.key}@{target_cycle} → {format_qubit_state(state)}", state
 
@@ -582,16 +588,22 @@ class MeasureASTNode:
 
             bits, vec = qpu.measure_register(k)
             _commit(k, cy, vec)
+            if simulator is not None and isinstance(k, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(k)
             return f"MEASURE {k}@{cy} → {bits}", vec
 
         results = {}
         for q in range(qpu.num_qubits):
             bits, vec = qpu.measure_register(q)
             _commit(q, current_cycle, vec)
+            if simulator is not None and isinstance(q, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(q)
             results[f"q{q}"] = bits
         for tok in list(qpu.custom_states):
             bits, vec = qpu.measure_register(tok)
             _commit(tok, current_cycle, vec)
+            if simulator is not None and isinstance(tok, int) and hasattr(simulator, "unlock_id"):
+                simulator.unlock_id(tok)
             results[str(tok)] = bits
 
         pretty = ", ".join(f"{k}:{v}" for k, v in results.items())

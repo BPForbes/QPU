@@ -88,6 +88,9 @@ class CircuitSimulator:
         # history for runtime fingerprinting
         self.runtime_history = []
 
+        # track SET locks per qubit id
+        self._locked = {}
+
         # child‑process support
         self.child_return_keys = []
         self.last_child_returns = {}
@@ -105,6 +108,8 @@ class CircuitSimulator:
 
     def increase_cycle(self):
         self._clock_stack[-1].local += 1
+        if hasattr(self.qpu, "apply_idle_noise"):
+            self.qpu.apply_idle_noise()
 
     def prune_cycles(self):
         for k in list(self.memory):
@@ -141,6 +146,16 @@ class CircuitSimulator:
                 del self.memory[k][c]
                 msgs.append(f"{k}@{c} freed")
         return ", ".join(msgs)
+
+    def lock_id(self, key):
+        self._locked[key] = True
+
+    def unlock_id(self, key):
+        if key in self._locked:
+            del self._locked[key]
+
+    def is_locked(self, key):
+        return self._locked.get(key, False)
 
     def get_runtime_history_string(self):
         return "\n".join(self.runtime_history)
