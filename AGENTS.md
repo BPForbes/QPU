@@ -177,3 +177,19 @@ To help Codex or other AI agents generate, complete, and refactor QPU `.txt` pro
    * Do INCREASECYCLE to make sure addresses are in the present and are not in the future. Do not declare addresses in the future or past with regard to the present current preasent cycle. Do not   
 
 By adhering to these conventions, AI agents can reliably author syntactically correct, semantically meaningful QPU instruction files that parse cleanly through `qpu/ast.py` and execute on the Python QPU simulator.
+
+## Cursor Cloud specific instructions
+
+This is a pure Python project (Python 3.12+) with two runtime dependencies: `numpy` and `cryptography`. There is no formal dependency management file; the update script installs them via `pip install numpy cryptography`.
+
+### Running the project
+
+- **Tests:** `python3 unittests.py` — runs 555 unittest-based tests (~2s).
+- **Interactive CLI:** `python3 main.py` — launches a 16-qubit QPU simulator REPL. The CLI reads from stdin; for non-interactive use, pipe commands in or use `echo "EXIT" | python3 main.py`.
+- **No linting is configured.** There are no flake8, ruff, mypy, or pylint configs in the repo.
+
+### Key caveats
+
+- The `qpu/` package has no `__init__.py`; it relies on Python 3.3+ implicit namespace packages.
+- `.txt` files at the repo root (`SingleBitFullAdder.txt`, `TwoBitFullAdder.txt`, etc.) are quantum protocol programs consumed by `COMPILEPROCESS`. They are not documentation — do not delete or restructure them.
+- The CLI is interactive (blocks on `input()`). When testing programmatically, use tmux or pipe input to avoid hanging.
